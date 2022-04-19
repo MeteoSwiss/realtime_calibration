@@ -1,0 +1,14 @@
+## This is code
+
+```{r }
+plot(1, 1)
+```
+```{r }
+library(ggplot2)
+library(dplyr)
+ggplot(tibble(a = c(1, 2, 3), b = c(5, 6, 7))) +
+  geom_point(aes(a, b)) +
+  theme(text=element_text(size=14, family="Helvetica"))
+```
+
+This should automatically update!
