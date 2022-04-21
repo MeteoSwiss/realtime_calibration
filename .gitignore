@@ -4,3 +4,7 @@
 .httr-oauth
 .DS_Store
 vignettes/analysis.pdf
+ext-data/dwh/pollen_dwh_daily.txt
+ext-data/dwh/pollen_dwh_hourly.txt
+.vscode/launch.json
+.Rprofile

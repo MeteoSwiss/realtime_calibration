@@ -49,3 +49,10 @@ options(error = function() {
     q(status = 1)
   }
 })
+
+rs <- function(args = NULL) {
+  getOption("rchitect.py_tools")$attach()
+  os <- import("os")
+  sys <- import("sys")
+  os$execv(sys$executable, c("sys$executable", "-m", "radian", args))
+}
