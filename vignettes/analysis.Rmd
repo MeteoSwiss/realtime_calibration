@@ -94,6 +94,114 @@ data_above10 <- data_combined %>%
 
 data_log10 <- data_above10 %>%
   mutate(value = if_else(value == 0, log10(value + 1), log10(value)))
+
+
+data_impact_categories <- data_above10 %>%
+  pivot_wider(names_from = type) %>%
+  mutate(
+    categories_measurement = case_when(
+      taxon == "Alnus" & measurement < 1 ~ "nothing",
+      taxon == "Alnus" & measurement >= 1 & measurement < 10 ~ "weak",
+      taxon == "Alnus" & measurement >= 10 & measurement < 70 ~ "medium",
+      taxon == "Alnus" & measurement >= 70 & measurement < 250 ~ "strong",
+      taxon == "Alnus" & measurement >= 250 ~ "verystrong",
+      taxon == "Corylus" & measurement < 1 ~ "nothing",
+      taxon == "Corylus" & measurement >= 1 & measurement < 10 ~ "weak",
+      taxon == "Corylus" & measurement >= 10 & measurement < 70 ~ "medium",
+      taxon == "Corylus" & measurement >= 70 & measurement < 250 ~ "strong",
+      taxon == "Corylus" & measurement >= 250 ~ "verystrong",
+      taxon == "Betula" & measurement < 1 ~ "nothing",
+      taxon == "Betula" & measurement >= 1 & measurement < 10 ~ "weak",
+      taxon == "Betula" & measurement >= 10 & measurement < 70 ~ "medium",
+      taxon == "Betula" & measurement >= 70 & measurement < 300 ~ "strong",
+      taxon == "Betula" & measurement >= 300 ~ "verystrong",
+      taxon == "Poaceae" & measurement < 1 ~ "nothing",
+      taxon == "Poaceae" & measurement >= 1 & measurement < 20 ~ "weak",
+      taxon == "Poaceae" & measurement >= 20 & measurement < 50 ~ "medium",
+      taxon == "Poaceae" & measurement >= 50 & measurement < 150 ~ "strong",
+      taxon == "Poaceae" & measurement >= 150 ~ "verystrong"
+    ),
+    categories_baseline = case_when(
+      taxon == "Alnus" & baseline < 1 ~ "nothing",
+      taxon == "Alnus" & baseline >= 1 & baseline < 10 ~ "weak",
+      taxon == "Alnus" & baseline >= 10 & baseline < 70 ~ "medium",
+      taxon == "Alnus" & baseline >= 70 & baseline < 250 ~ "strong",
+      taxon == "Alnus" & baseline >= 250 ~ "verystrong",
+      taxon == "Corylus" & baseline < 1 ~ "nothing",
+      taxon == "Corylus" & baseline >= 1 & baseline < 10 ~ "weak",
+      taxon == "Corylus" & baseline >= 10 & baseline < 70 ~ "medium",
+      taxon == "Corylus" & baseline >= 70 & baseline < 250 ~ "strong",
+      taxon == "Corylus" & baseline >= 250 ~ "verystrong",
+      taxon == "Betula" & baseline < 1 ~ "nothing",
+      taxon == "Betula" & baseline >= 1 & baseline < 10 ~ "weak",
+      taxon == "Betula" & baseline >= 10 & baseline < 70 ~ "medium",
+      taxon == "Betula" & baseline >= 70 & baseline < 300 ~ "strong",
+      taxon == "Betula" & baseline >= 300 ~ "verystrong",
+      taxon == "Poaceae" & baseline < 1 ~ "nothing",
+      taxon == "Poaceae" & baseline >= 1 & baseline < 20 ~ "weak",
+      taxon == "Poaceae" & baseline >= 20 & baseline < 50 ~ "medium",
+      taxon == "Poaceae" & baseline >= 50 & baseline < 150 ~ "strong",
+      taxon == "Poaceae" & baseline >= 150 ~ "verystrong"
+    ),
+    categories_calibration = case_when(
+      taxon == "Alnus" & calibration < 1 ~ "nothing",
+      taxon == "Alnus" & calibration >= 1 & calibration < 10 ~ "weak",
+      taxon == "Alnus" & calibration >= 10 & calibration < 70 ~ "medium",
+      taxon == "Alnus" & calibration >= 70 & calibration < 250 ~ "strong",
+      taxon == "Alnus" & calibration >= 250 ~ "verystrong",
+      taxon == "Corylus" & calibration < 1 ~ "nothing",
+      taxon == "Corylus" & calibration >= 1 & calibration < 10 ~ "weak",
+      taxon == "Corylus" & calibration >= 10 & calibration < 70 ~ "medium",
+      taxon == "Corylus" & calibration >= 70 & calibration < 250 ~ "strong",
+      taxon == "Corylus" & calibration >= 250 ~ "verystrong",
+      taxon == "Betula" & calibration < 1 ~ "nothing",
+      taxon == "Betula" & calibration >= 1 & calibration < 10 ~ "weak",
+      taxon == "Betula" & calibration >= 10 & calibration < 70 ~ "medium",
+      taxon == "Betula" & calibration >= 70 & calibration < 300 ~ "strong",
+      taxon == "Betula" & calibration >= 300 ~ "verystrong",
+      taxon == "Poaceae" & calibration < 1 ~ "nothing",
+      taxon == "Poaceae" & calibration >= 1 & calibration < 20 ~ "weak",
+      taxon == "Poaceae" & calibration >= 20 & calibration < 50 ~ "medium",
+      taxon == "Poaceae" & calibration >= 50 & calibration < 150 ~ "strong",
+      taxon == "Poaceae" & calibration >= 150 ~ "verystrong"
+    )
+  ) %>%
+  mutate_at(
+    vars(categories_measurement, categories_baseline, categories_calibration),
+    ~ factor(., levels = c("nothing", "weak", "medium", "strong", "verystrong"))
+  ) %>%
+  filter(categories_measurement != "nothing")
+
+
+data_impact_categories_mean <- data_above10 %>%
+  pivot_wider(names_from = type, values_from = value) %>%
+  mutate(mean = (measurement + baseline + calibration) / 3,
+    categories_mean = case_when(
+      taxon == "Alnus" & mean < 1 ~ "nothing",
+      taxon == "Alnus" & mean >= 1 & mean < 10 ~ "weak",
+      taxon == "Alnus" & mean >= 10 & mean < 70 ~ "medium",
+      taxon == "Alnus" & mean >= 70 & mean < 250 ~ "strong",
+      taxon == "Alnus" & mean >= 250 ~ "verystrong",
+      taxon == "Corylus" & mean < 1 ~ "nothing",
+      taxon == "Corylus" & mean >= 1 & mean < 10 ~ "weak",
+      taxon == "Corylus" & mean >= 10 & mean < 70 ~ "medium",
+      taxon == "Corylus" & mean >= 70 & mean < 250 ~ "strong",
+      taxon == "Corylus" & mean >= 250 ~ "verystrong",
+      taxon == "Betula" & mean < 1 ~ "nothing",
+      taxon == "Betula" & mean >= 1 & mean < 10 ~ "weak",
+      taxon == "Betula" & mean >= 10 & mean < 70 ~ "medium",
+      taxon == "Betula" & mean >= 70 & mean < 300 ~ "strong",
+      taxon == "Betula" & mean >= 300 ~ "verystrong",
+      taxon == "Poaceae" & mean < 1 ~ "nothing",
+      taxon == "Poaceae" & mean >= 1 & mean < 20 ~ "weak",
+      taxon == "Poaceae" & mean >= 20 & mean < 50 ~ "medium",
+      taxon == "Poaceae" & mean >= 50 & mean < 150 ~ "strong",
+      taxon == "Poaceae" & mean >= 150 ~ "verystrong"
+  )) %>%
+  pivot_longer(measurement:calibration, names_to = "type", values_to = "value") %>%
+  pivot_wider(names_from = categories_mean, values_from = value)
+
+
 ```
 
 ## Visual Assessment
@@ -339,6 +447,67 @@ gg_ab2 <- data_altman %>%
 
 ```
 
+## Density Plots
+
+These plots allow to observe the error for different concentration categories.
+
+```{r include=FALSE}
+categs <- c("weak", "medium", "strong", "verystrong")
+
+gg_conc_dens <- list()
+
+labels_y <- list(0.1, 0.015, 0.004, 0.002)
+labels_y_hist <- list(15, 13, 10, 10, 7.5, 3)
+names(labels_y) <- categs
+
+for (j in categs) {
+  if (j %in% names(data_impact_categories_mean)) {
+    obs <- data_impact_categories_mean %>%
+      filter(!is.na(!!sym(j))) %>%
+      summarise(n() / 2) %>%
+      pull()
+    obs <- paste("# of Observations:", obs)
+
+    gg_conc_dens[[j]] <- data_impact_categories_mean %>%
+      filter(!is.na(!!sym(j))) %>%
+      ggplot() +
+      # The area under that whole curve should be 1.
+      # To get an estimate of the probability of certain values,
+      # you'd have to integrate over an interval on your 'y' axis,
+      # and that value should never be greater than 1.
+      geom_density(aes(x = !!sym(j), col = type, fill = type), alpha = 0.15) +
+      geom_label(label = obs, aes(x = max(!!sym(j)) * 0.7), y = labels_y[[j]]) +
+      scale_colour_manual("", values = col_hex) +
+      scale_fill_manual(values = col_hex) +
+      coord_cartesian(xlim = c(0, NA)) +
+      guides(fill = "none")
+  }
+}
+
+```
+
+```{r echo=FALSE, fig.height = 8, fig.width = 13, fig.dpi=300, out.width="100%"}
+
+(gg_dens_conc <- ggarrange(plotlist = gg_conc_dens) %>%
+  annotate_figure(
+    top = paste(
+      "Comparison of Measurements and Model Predictions",
+      "for All Stations and Different Concentration Groups."
+    ),
+    bottom = text_grob(paste0("We are looking at Density Kernel Estimators ",
+      "for all three traps to compare the measurements between them. ",
+      "\n The area under each curve adds up to 1 and makes it possible ",
+      "to vizualise the (dis-)similarities of measurements from the ",
+      "three traps. \n It is basically a smoothed histogram. ",
+      "The buckets are based on the mean concentrations of measurements and model."),
+      face = "italic",
+      size = 10
+    )
+  ))
+
+```
+
+
 ## Statistical Assessment
 
 First, various metrics are compared where the pollen concentrations are considered a continuous numerical variable.
@@ -390,82 +559,6 @@ The Kappa metric is explained here and was chosen as the most meaningful metric 
 https://towardsdatascience.com/multi-class-metrics-made-simple-the-kappa-score-aka-cohens-kappa-coefficient-bdea137af09c
 
 ```{r echo=FALSE}
-data_impact_categories <- data_above10 %>%
-  pivot_wider(names_from = type) %>%
-  mutate(
-    categories_measurement = case_when(
-      taxon == "Alnus" & measurement < 1 ~ "nothing",
-      taxon == "Alnus" & measurement >= 1 & measurement < 10 ~ "weak",
-      taxon == "Alnus" & measurement >= 10 & measurement < 70 ~ "medium",
-      taxon == "Alnus" & measurement >= 70 & measurement < 250 ~ "strong",
-      taxon == "Alnus" & measurement >= 250 ~ "verystrong",
-      taxon == "Corylus" & measurement < 1 ~ "nothing",
-      taxon == "Corylus" & measurement >= 1 & measurement < 10 ~ "weak",
-      taxon == "Corylus" & measurement >= 10 & measurement < 70 ~ "medium",
-      taxon == "Corylus" & measurement >= 70 & measurement < 250 ~ "strong",
-      taxon == "Corylus" & measurement >= 250 ~ "verystrong",
-      taxon == "Betula" & measurement < 1 ~ "nothing",
-      taxon == "Betula" & measurement >= 1 & measurement < 10 ~ "weak",
-      taxon == "Betula" & measurement >= 10 & measurement < 70 ~ "medium",
-      taxon == "Betula" & measurement >= 70 & measurement < 300 ~ "strong",
-      taxon == "Betula" & measurement >= 300 ~ "verystrong",
-      taxon == "Poaceae" & measurement < 1 ~ "nothing",
-      taxon == "Poaceae" & measurement >= 1 & measurement < 20 ~ "weak",
-      taxon == "Poaceae" & measurement >= 20 & measurement < 50 ~ "medium",
-      taxon == "Poaceae" & measurement >= 50 & measurement < 150 ~ "strong",
-      taxon == "Poaceae" & measurement >= 150 ~ "verystrong"
-    ),
-    categories_baseline = case_when(
-      taxon == "Alnus" & baseline < 1 ~ "nothing",
-      taxon == "Alnus" & baseline >= 1 & baseline < 10 ~ "weak",
-      taxon == "Alnus" & baseline >= 10 & baseline < 70 ~ "medium",
-      taxon == "Alnus" & baseline >= 70 & baseline < 250 ~ "strong",
-      taxon == "Alnus" & baseline >= 250 ~ "verystrong",
-      taxon == "Corylus" & baseline < 1 ~ "nothing",
-      taxon == "Corylus" & baseline >= 1 & baseline < 10 ~ "weak",
-      taxon == "Corylus" & baseline >= 10 & baseline < 70 ~ "medium",
-      taxon == "Corylus" & baseline >= 70 & baseline < 250 ~ "strong",
-      taxon == "Corylus" & baseline >= 250 ~ "verystrong",
-      taxon == "Betula" & baseline < 1 ~ "nothing",
-      taxon == "Betula" & baseline >= 1 & baseline < 10 ~ "weak",
-      taxon == "Betula" & baseline >= 10 & baseline < 70 ~ "medium",
-      taxon == "Betula" & baseline >= 70 & baseline < 300 ~ "strong",
-      taxon == "Betula" & baseline >= 300 ~ "verystrong",
-      taxon == "Poaceae" & baseline < 1 ~ "nothing",
-      taxon == "Poaceae" & baseline >= 1 & baseline < 20 ~ "weak",
-      taxon == "Poaceae" & baseline >= 20 & baseline < 50 ~ "medium",
-      taxon == "Poaceae" & baseline >= 50 & baseline < 150 ~ "strong",
-      taxon == "Poaceae" & baseline >= 150 ~ "verystrong"
-    ),
-    categories_calibration = case_when(
-      taxon == "Alnus" & calibration < 1 ~ "nothing",
-      taxon == "Alnus" & calibration >= 1 & calibration < 10 ~ "weak",
-      taxon == "Alnus" & calibration >= 10 & calibration < 70 ~ "medium",
-      taxon == "Alnus" & calibration >= 70 & calibration < 250 ~ "strong",
-      taxon == "Alnus" & calibration >= 250 ~ "verystrong",
-      taxon == "Corylus" & calibration < 1 ~ "nothing",
-      taxon == "Corylus" & calibration >= 1 & calibration < 10 ~ "weak",
-      taxon == "Corylus" & calibration >= 10 & calibration < 70 ~ "medium",
-      taxon == "Corylus" & calibration >= 70 & calibration < 250 ~ "strong",
-      taxon == "Corylus" & calibration >= 250 ~ "verystrong",
-      taxon == "Betula" & calibration < 1 ~ "nothing",
-      taxon == "Betula" & calibration >= 1 & calibration < 10 ~ "weak",
-      taxon == "Betula" & calibration >= 10 & calibration < 70 ~ "medium",
-      taxon == "Betula" & calibration >= 70 & calibration < 300 ~ "strong",
-      taxon == "Betula" & calibration >= 300 ~ "verystrong",
-      taxon == "Poaceae" & calibration < 1 ~ "nothing",
-      taxon == "Poaceae" & calibration >= 1 & calibration < 20 ~ "weak",
-      taxon == "Poaceae" & calibration >= 20 & calibration < 50 ~ "medium",
-      taxon == "Poaceae" & calibration >= 50 & calibration < 150 ~ "strong",
-      taxon == "Poaceae" & calibration >= 150 ~ "verystrong"
-    )
-  ) %>%
-  mutate_at(
-    vars(categories_measurement, categories_baseline, categories_calibration),
-    ~ factor(., levels = c("nothing", "weak", "medium", "strong", "verystrong"))
-  ) %>%
-  filter(categories_measurement != "nothing")
-
 matrix_baseline <- confusionMatrix(
   data_impact_categories$categories_baseline,
   data_impact_categories$categories_measurement
