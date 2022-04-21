@@ -79,7 +79,7 @@ The following settings are crucial and should always be remembered when running 
 data_combined <- data_dwh %>%
   pivot_wider(names_from = type) %>%
   inner_join(data_cosmo %>%
-  pivot_wider(names_from = type), by = c("taxon", "station", "date")) %>%
+    pivot_wider(names_from = type), by = c("taxon", "station", "date")) %>%
   select(taxon, station, datetime = datetime.x, date, hour = hour.x, measurement, baseline, calibration) %>%
   pivot_longer(measurement:calibration, names_to = "type", values_to = "value") %>%
   select(taxon, station, type, value, datetime, date, hour)
@@ -94,7 +94,6 @@ data_above10 <- data_combined %>%
 
 data_log10 <- data_above10 %>%
   mutate(value = if_else(value == 0, log10(value + 1), log10(value)))
-  
 ```
 
 ## Visual Assessment
@@ -104,12 +103,13 @@ data_log10 <- data_above10 %>%
 In the following the user can select one species and one year to compare the three datasets.
 
 ```{r include=FALSE}
-data_timeseries <- 
+data_timeseries <-
   data_combined %>%
   filter(
     between(date, as.Date("2020-01-15"), as.Date("2020-04-01")),
     station == "Zürich",
-    taxon == "Alnus")
+    taxon == "Alnus"
+  )
 
 gg1 <- data_timeseries %>%
   ggplot(aes(x = datetime)) +
@@ -166,8 +166,8 @@ sd_hirst <- data_timeseries %>%
 ```
 
 ```{r echo=FALSE, fig.height = 8, fig.width = 13, fig.dpi=300, out.width="100%"}
-    ggarrange(ggarrange(gg1, gg2, nrow = 2), gg3) %>%
-      annotate_figure(top = "Comparison of Models for one Station in one Year")
+ggarrange(ggarrange(gg1, gg2, nrow = 2), gg3) %>%
+  annotate_figure(top = "Comparison of Models for one Station in one Year")
 ```
 
 ### Correlation Plots
@@ -189,14 +189,14 @@ A good summary of the methods and their shortcomings can be found here: https://
 
 methods <- c("pearson", "spearman", "kendall")
 
-# For the robust methods (spearman, kendall) 
+# For the robust methods (spearman, kendall)
 # it doesn't matter whether the transformed data is used or the original
 
-data_corr <- data_log10 %>% 
+data_corr <- data_log10 %>%
   pivot_wider(names_from = type) %>%
   select(datetime, measurement, baseline, calibration)
 
-corr_matrix <- map(methods, ~corr.test(
+corr_matrix <- map(methods, ~ corr.test(
   data_corr %>% select(-datetime),
   use = "complete",
   method = .x,
@@ -204,7 +204,7 @@ corr_matrix <- map(methods, ~corr.test(
   alpha = .05,
   ci = TRUE,
   minlength = 5
-  ))
+))
 ```
 
 ```{r include=FALSE}
@@ -261,19 +261,21 @@ If the points lie within the two SD-line for the differences the datasets can be
 
 ```{r include=FALSE}
 
-data_altman <- data_above10 %>% 
-    pivot_wider(names_from = type) %>% 
-    select(datetime, measurement, baseline, calibration) %>% 
-    mutate(mean_baseline = (measurement + baseline) / 2,
-           mean_calibration = (measurement + calibration) / 2,
-           diff_baseline = baseline - measurement,
-           diff_calibration = calibration - measurement)
+data_altman <- data_above10 %>%
+  pivot_wider(names_from = type) %>%
+  select(datetime, measurement, baseline, calibration) %>%
+  mutate(
+    mean_baseline = (measurement + baseline) / 2,
+    mean_calibration = (measurement + calibration) / 2,
+    diff_baseline = baseline - measurement,
+    diff_calibration = calibration - measurement
+  )
 
 
-sd_diff <- data_altman %>% 
-  select(starts_with("diff")) %>% 
-  summarise_all(~ sd(.)) %>% 
-  pivot_longer(1:2, values_to = "sd", names_to = "dummy") %>% 
+sd_diff <- data_altman %>%
+  select(starts_with("diff")) %>%
+  summarise_all(~ sd(.)) %>%
+  pivot_longer(1:2, values_to = "sd", names_to = "dummy") %>%
   pull(sd)
 
 gg_ab1 <- data_altman %>%
@@ -332,7 +334,7 @@ gg_ab2 <- data_altman %>%
 (gg_ab <- ggarrange(gg_ab1, gg_ab2, ncol = 2) %>%
   annotate_figure(top = "Altman-Bland Plots", bottom = text_grob("Pairwise comparison of Models; blue line shows the Loess smother; the red line shows a theroratical perfect
   agreement between Model and Measurements of zero. The dashed red line shows the 2 * sd of the differences, where we expect the points to lie within.",
-  face = "italic", size = 12
+    face = "italic", size = 12
   )))
 
 ```
@@ -349,9 +351,9 @@ metrics_baseline <- data_above10 %>%
     error = baseline - measurement,
   ) %>%
   summarise(
-    R2= cor(baseline, measurement, method = "spearman", use = "complete.obs")^2,
+    R2 = cor(baseline, measurement, method = "spearman", use = "complete.obs")^2,
     Bias = mean(error),
-    SD= sd(error),
+    SD = sd(error),
     MAE = mean(abs(error)),
     RMSE = sqrt(mean((error)^2)),
     MSLE = mean((log(1 + baseline) - log(1 + measurement))^2, na.rm = TRUE),
@@ -366,9 +368,9 @@ metrics_calibration <- data_above10 %>%
     error = calibration - measurement,
   ) %>%
   summarise(
-    R2= cor(calibration, measurement, method = "spearman", use = "complete.obs")^2,
+    R2 = cor(calibration, measurement, method = "spearman", use = "complete.obs")^2,
     Bias = mean(error),
-    SD= sd(error),
+    SD = sd(error),
     MAE = mean(abs(error)),
     RMSE = sqrt(mean((error)^2)),
     MSLE = mean((log(1 + calibration) - log(1 + measurement))^2, na.rm = TRUE),
@@ -379,7 +381,7 @@ metrics_calibration <- data_above10 %>%
 metrics_baseline %>%
   bind_rows(metrics_calibration) %>%
   kable() %>%
-  kable_styling("striped", full_width = FALSE) 
+  kable_styling("striped", full_width = FALSE)
 ```
 Second, the values will be converted into health impact based buckets.
 The impact classes have been defined https://service.meteoswiss.ch/confluence/x/1ZG4
@@ -434,7 +436,7 @@ data_impact_categories <- data_above10 %>%
       taxon == "Poaceae" & baseline >= 20 & baseline < 50 ~ "medium",
       taxon == "Poaceae" & baseline >= 50 & baseline < 150 ~ "strong",
       taxon == "Poaceae" & baseline >= 150 ~ "verystrong"
-    ), 
+    ),
     categories_calibration = case_when(
       taxon == "Alnus" & calibration < 1 ~ "nothing",
       taxon == "Alnus" & calibration >= 1 & calibration < 10 ~ "weak",
@@ -460,26 +462,31 @@ data_impact_categories <- data_above10 %>%
   ) %>%
   mutate_at(
     vars(categories_measurement, categories_baseline, categories_calibration),
-    ~ factor(., levels = c("nothing", "weak", "medium", "strong", "verystrong"))) %>%
-    filter(categories_measurement != "nothing")
+    ~ factor(., levels = c("nothing", "weak", "medium", "strong", "verystrong"))
+  ) %>%
+  filter(categories_measurement != "nothing")
 
 matrix_baseline <- confusionMatrix(
   data_impact_categories$categories_baseline,
   data_impact_categories$categories_measurement
-) 
-kappa_baseline  <- matrix_baseline$overall[1:2] %>%
+)
+kappa_baseline <- matrix_baseline$overall[1:2] %>%
   tibble() %>%
-  mutate(type = "baseline",
-    metric = c("Accuracy", "Kappa"))
+  mutate(
+    type = "baseline",
+    metric = c("Accuracy", "Kappa")
+  )
 
 matrix_calibration <- confusionMatrix(
   data_impact_categories$categories_calibration,
   data_impact_categories$categories_measurement
-) 
-kappa_calibration  <- matrix_calibration$overall[1:2] %>%
+)
+kappa_calibration <- matrix_calibration$overall[1:2] %>%
   tibble() %>%
-  mutate(type = "calibration",
-  metric = c("Accuracy", "Kappa"))
+  mutate(
+    type = "calibration",
+    metric = c("Accuracy", "Kappa")
+  )
 
 kappa_baseline %>%
   bind_rows(kappa_calibration) %>%
@@ -511,17 +518,21 @@ The formulas used here are:
 ```{r echo=FALSE}
 matrix_baseline$byClass %>%
   as_tibble() %>%
-  mutate(class = rownames(matrix_baseline$byClass),
-  type = "baseline") %>%
+  mutate(
+    class = rownames(matrix_baseline$byClass),
+    type = "baseline"
+  ) %>%
   filter(class != "Class: nothing") %>%
   bind_rows(
     matrix_calibration$byClass %>%
-  as_tibble() %>%
-  mutate(class = rownames(matrix_calibration$byClass),
-  type = "calibration") %>%
-  filter(class != "Class: nothing")
+      as_tibble() %>%
+      mutate(
+        class = rownames(matrix_calibration$byClass),
+        type = "calibration"
+      ) %>%
+      filter(class != "Class: nothing")
   ) %>%
-  mutate(across(c(-class, -type), ~round(., digits = 3))) %>%
+  mutate(across(c(-class, -type), ~ round(., digits = 3))) %>%
   kable() %>%
   kable_styling("striped", full_width = FALSE)
 ```
@@ -540,9 +551,9 @@ If the Estimator is > 0.5 then the second trap tends to have larger measurements
 
 npar_contr <- map(species$taxon[-3], ~
   nparcomp(
-    value ~type,
-    data = data_log10  %>%
-    filter(taxon == .x),
+    value ~ type,
+    data = data_log10 %>%
+      filter(taxon == .x),
     # slice(1:3870),
     conf.level = 0.95,
     alternative = "two.sided",
@@ -550,25 +561,25 @@ npar_contr <- map(species$taxon[-3], ~
     control = "measurement"
   ))
 
-  title <- paste(
-    "Robust Contrasts and Confidence Intervals for Corylus Measurements"
-  )
-  myheader <- c(title = 6)
-  names(myheader) <- title
+title <- paste(
+  "Robust Contrasts and Confidence Intervals for Corylus Measurements"
+)
+myheader <- c(title = 6)
+names(myheader) <- title
 
-  npar_contr[[1]]$Analysis %>%
-    bind_rows(npar_contr[[2]]$Analysis,
-    npar_contr[[2]]$Analysis) %>%
-    mutate(taxon = rep(species$taxon[-3], each = 2)) %>%
-    mutate(across(where(is.numeric), round, 3)) %>%
-    select(Taxon = taxon, Comparison, Estimator, Lower, Upper, pValue = p.Value) %>%
-    mutate(pValue = if_else(pValue < 0.05,
-      cell_spec(pValue, color = "red"),
-      cell_spec(pValue)
-    )) %>%
-    kable(escape = FALSE) %>%
-    kable_styling("striped", full_width = FALSE) %>%
-    add_header_above(myheader)
-
-
+npar_contr[[1]]$Analysis %>%
+  bind_rows(
+    npar_contr[[2]]$Analysis,
+    npar_contr[[2]]$Analysis
+  ) %>%
+  mutate(taxon = rep(species$taxon[-3], each = 2)) %>%
+  mutate(across(where(is.numeric), round, 3)) %>%
+  select(Taxon = taxon, Comparison, Estimator, Lower, Upper, pValue = p.Value) %>%
+  mutate(pValue = if_else(pValue < 0.05,
+    cell_spec(pValue, color = "red"),
+    cell_spec(pValue)
+  )) %>%
+  kable(escape = FALSE) %>%
+  kable_styling("striped", full_width = FALSE) %>%
+  add_header_above(myheader)
 ```
