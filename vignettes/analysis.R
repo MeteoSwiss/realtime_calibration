@@ -1,4 +1,26 @@
-
+#' ---
+#' title: "A real-time calibration method for the numerical pollen forecast model COSMO-ART"
+#' author: "Simon Adamov & Andreas Pauling"
+#' date: "`r format(Sys.Date(), '%B %d, %Y')`"
+#' always_allow_html: TRUE
+#' output:
+#'   html_document:
+#'     df_print: paged 
+#'   pdf_document: default
+#'   word_document: default
+#' ---
+#' 
+#' In this project we want to evaluate the new pollen forecast module that uses "realtime data"
+#' for calibration. As new automatic pollen monitors are being deployed, realtime calibration
+#' of pollen forecast from weather models becomes more and more relevant.
+#' 
+#' This study uses old measurements and weather model reforcasts to investigate various
+#' implementations and possibilities in terms of forecast improvements.
+#' 
+#' For very detailed information about the final implementation in COSMO-1E please refer to this 
+#' documentation page (ask meteoswiss for access): https://service.meteoswiss.ch/confluence/x/dYQYBQ
+#' 
+## ----include=FALSE----------------------------------------------------------------------------------------------------------------------------------------------------------------------
 library(readr)
 library(dplyr)
 library(tidyr)
@@ -22,23 +44,38 @@ conflict_prefer("filter", "dplyr")
 
 devtools::load_all()
 
-
-
+#' 
+## ----include=FALSE----------------------------------------------------------------------------------------------------------------------------------------------------------------------
 # Main colors for the analysis
 theme_set(theme_minimal(base_size = 14))
 col_names <- c("measurement", "baseline", "calibration")
 col_hex <- c("#3b3a3a", "#e98962", "#66C2A5")
 names(col_hex) <- col_names
 
-
-
+#' 
+#' 
+## ----include=FALSE----------------------------------------------------------------------------------------------------------------------------------------------------------------------
 load(paste0(here(), "/data/other/species.RData"))
 load(paste0(here(), "/data/other/stations.RData"))
 load(paste0(here(), "/data/cosmo/data_cosmo.RData"))
 load(paste0(here(), "/data/dwh/data_dwh.RData"))
 
-
-
+#' 
+#' ## The Data
+#' 
+#' Three datasets are available for that endeavour:
+#' 
+#' - _measurement_ referring to daily pollen concentration measurements as collected by a Hirst trap and available in the Data-Warehouse at meteoswiss
+#' - _baseline_ referring to daily pollen concentration forecasts from the COSMO-1E model *without* calibraton module
+#' - _calibration_ referring to daily pollen concentration forecasts from the COSMO-1E model *with* calibraton module
+#' 
+#' The following settings are crucial and should always be remembered when running the chunks below:
+#' 
+#' - The temporal resolution for this analysis is daily averages - pollen verification can be sensitive to temporal resolution
+#' - The species of pollen can be assessed individually or combined 
+#' - The threshold below which Pollen measurements are excluded from the data is set to 10 currently, as they become unreliant
+#' 
+## ----include=FALSE----------------------------------------------------------------------------------------------------------------------------------------------------------------------
 data_combined <- data_dwh %>%
   pivot_wider(names_from = type) %>%
   inner_join(data_cosmo %>%
@@ -166,8 +203,14 @@ data_impact_categories_mean <- data_above10 %>%
 
 
 
-
-
+#' 
+#' ## Visual Assessment
+#' 
+#' ### Basic Plots
+#' 
+#' In the following the user can select one species and one year to compare the three datasets.
+#' 
+## ----include=FALSE----------------------------------------------------------------------------------------------------------------------------------------------------------------------
 data_timeseries <-
   data_combined %>%
   filter(
@@ -183,8 +226,9 @@ gg1 <- data_timeseries %>%
   theme(legend.position = "none") +
   scale_color_manual(values = col_hex)
 
-
-
+#' 
+#' 
+## ----include=FALSE----------------------------------------------------------------------------------------------------------------------------------------------------------------------
 gg2 <- data_timeseries %>%
   ggplot() +
   geom_boxplot(aes(y = log10(value), fill = type)) +
@@ -196,8 +240,8 @@ gg2 <- data_timeseries %>%
   labs(y = "Log Mean Conc. [Pollen/m³]", x = "") +
   scale_fill_manual(values = col_hex)
 
-
-
+#' 
+## ----include=FALSE----------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 sd_hirst <- data_timeseries %>%
   group_by(type) %>%
@@ -228,13 +272,28 @@ sd_hirst <- data_timeseries %>%
   labs(x = "Occurence of Pollen Concentrations", y = "Log Mean Conc. [Pollen/m³]"))
 
 
-
+#' 
 ## ----echo=FALSE, fig.height = 8, fig.width = 13, fig.dpi=300, out.width="100%"----------------------------------------------------------------------------------------------------------
 ggarrange(ggarrange(gg1, gg2, nrow = 2), gg3) %>%
   annotate_figure(top = "Comparison of Models for one Station in one Year")
 
-
-
+#' 
+#' ### Correlation Plots
+#' 
+#' The correlation between the Model and Measurements can be calculated easily and then the CI and p-values must be adjusted for multiple comparison.
+#' The corr-test function from the psych handily offers this functionality.
+#' 
+#' Careful the correlation coefficients method have some serious shortcomings:
+#' 
+#' The correlation coefficient measures linear agreement--whether the measurements go up-and-down together. Certainly, we want the measures to go up-and-down together, but the correlation coefficient itself is deficient in at least three ways as a measure of agreement. (http://www.jerrydallal.com/LHSP/compare.htm)
+#' 
+#' - The correlation coefficient can be close to 1 (or equal to 1!) even when there is considerable bias between the two methods. For example, if one method gives measurements that are always 10 units higher than the other method, the correlation will be 1 exactly, but the measurements will always be 10 units apart.
+#' - The magnitude of the correlation coefficient is affected by the range of subjects/units studied. The correlation coefficient can be made smaller by measuring samples that are similar to each other and larger by measuring samples that are very different from each other. The magnitude of the correlation says nothing about the magnitude of the differences between the paired measurements which, when you get right down to it, is all that really matters.
+#' - The usual significance test involving a correlation coefficient-- whether the population value is 0--is irrelevant to the comparability problem. What is important is not merely that the correlation coefficient be different from 0. Rather, it should be close to (ideally, equal to) 1! 
+#' 
+#' A good summary of the methods and their shortcomings can be found here: https://www.statisticssolutions.com/correlation-Pearson-Kendall-spearman/
+#' 
+## ----include=FALSE----------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 methods <- c("pearson", "spearman", "kendall")
 
@@ -255,8 +314,8 @@ corr_matrix <- map(methods, ~ corr.test(
   minlength = 5
 ))
 
-
-
+#' 
+## ----include=FALSE----------------------------------------------------------------------------------------------------------------------------------------------------------------------
 ci <- map(corr_matrix, ~ .x %>%
   pluck(10)) %>%
   bind_rows() %>%
@@ -271,8 +330,8 @@ ci <- map(corr_matrix, ~ .x %>%
   )
 
 
-
-
+#' 
+## ----include=FALSE----------------------------------------------------------------------------------------------------------------------------------------------------------------------
 gg_corr1 <- data_corr %>%
   ggplot(aes(x = measurement, y = baseline)) +
   geom_point(alpha = 0.1, col = "#222225") +
@@ -281,8 +340,8 @@ gg_corr1 <- data_corr %>%
   geom_label(data = ci %>% filter(comparison == "mb"), aes(label = label, x = x, y = y), parse = TRUE) +
   coord_cartesian(ylim = c(0, 4), xlim = c(0, 4))
 
-
-
+#' 
+## ----include=FALSE----------------------------------------------------------------------------------------------------------------------------------------------------------------------
 gg_corr2 <- data_corr %>%
   ggplot(aes(x = measurement, y = calibration)) +
   geom_point(alpha = 0.1, col = "#222225") +
@@ -291,7 +350,8 @@ gg_corr2 <- data_corr %>%
   geom_label(data = ci %>% filter(comparison == "mc"), aes(label = label, x = x, y = y), parse = TRUE) +
   coord_cartesian(ylim = c(0, 4), xlim = c(0, 4))
 
-
+#' 
+#' 
 ## ----echo=FALSE, fig.height = 8, fig.width = 13, fig.dpi=300, out.width="100%"----------------------------------------------------------------------------------------------------------
 (gg_corr <- ggarrange(gg_corr1, gg_corr2, ncol = 2) %>%
   annotate_figure(
@@ -301,8 +361,13 @@ gg_corr2 <- data_corr %>%
     )
   ))
 
-
-
+#' 
+#' ## Altman Bland Plots
+#' 
+#' The well established AB-method for clinical trials can be used here as well to compare the means and differences between datasets. 
+#' If the points lie within the two SD-line for the differences the datasets can be assumed to be strongly associated with each other. 
+#' 
+## ----include=FALSE----------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 data_altman <- data_above10 %>%
   pivot_wider(names_from = type) %>%
@@ -345,8 +410,8 @@ gg_ab1 <- data_altman %>%
   geom_smooth(alpha = 0.3, col = "#3081b8", fill = "#74cbee") +
   labs(y = "Difference(Baseline - Measurement)", x = "Mean(Baseline, Measurement)")
 
-
-
+#' 
+## ----include=FALSE----------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 gg_ab2 <- data_altman %>%
   ggplot(aes(x = mean_calibration, y = diff_calibration)) +
@@ -372,7 +437,7 @@ gg_ab2 <- data_altman %>%
   geom_smooth(alpha = 0.3, col = "#3081b8", fill = "#74cbee") +
   labs(y = "Difference(Calibration - Measurement)", x = "Mean(Calibration, Measurement)")
 
-
+#' 
 ## ----echo=FALSE, fig.height = 8, fig.width = 13, fig.dpi=300, out.width="100%"----------------------------------------------------------------------------------------------------------
 (gg_ab <- ggarrange(gg_ab1, gg_ab2, ncol = 2) %>%
   annotate_figure(top = "Altman-Bland Plots", bottom = text_grob("Pairwise comparison of Models; blue line shows the Loess smother; the red line shows a theroratical perfect
@@ -381,8 +446,12 @@ gg_ab2 <- data_altman %>%
   )))
 
 
-
-
+#' 
+#' ## Density Plots
+#' 
+#' These plots allow to observe the error for different concentration categories.
+#' 
+## ----include=FALSE----------------------------------------------------------------------------------------------------------------------------------------------------------------------
 categs <- c("weak", "medium", "strong", "verystrong")
 
 gg_conc_dens <- list()
@@ -416,7 +485,7 @@ for (j in categs) {
 }
 
 
-
+#' 
 ## ----echo=FALSE, fig.height = 8, fig.width = 13, fig.dpi=300, out.width="100%"----------------------------------------------------------------------------------------------------------
 
 (gg_dens_conc <- ggarrange(plotlist = gg_conc_dens) %>%
@@ -437,7 +506,12 @@ for (j in categs) {
   ))
 
 
-
+#' 
+#' 
+#' ## Statistical Assessment
+#' 
+#' First, various metrics are compared where the pollen concentrations are considered a continuous numerical variable.
+#' 
 ## ----echo=FALSE-------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 metrics_baseline <- data_above10 %>%
   pivot_wider(names_from = type) %>%
@@ -478,7 +552,12 @@ metrics_baseline %>%
   kable() %>%
   kable_styling("striped", full_width = FALSE)
 
-
+#' Second, the values will be converted into health impact based buckets.
+#' The impact classes have been defined https://service.meteoswiss.ch/confluence/x/1ZG4
+#' Now we can investigate various metrics that are typically used for categoric variables.
+#' The Kappa metric is explained here and was chosen as the most meaningful metric for this analysis:
+#' https://towardsdatascience.com/multi-class-metrics-made-simple-the-kappa-score-aka-cohens-kappa-coefficient-bdea137af09c
+#' 
 ## ----echo=FALSE-------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 matrix_baseline <- confusionMatrix(
   data_impact_categories$categories_baseline,
@@ -508,7 +587,27 @@ kappa_baseline %>%
   kable() %>%
   kable_styling("striped", full_width = FALSE)
 
-
+#' 
+#' The following table could be used in the appendix.
+#' 
+#' Reference Event No Event
+#' Predicted 
+#' Event     A        B
+#' No Event  C        D
+#' The formulas used here are:
+#' 
+#' - Sensitivity = A/(A+C)
+#' - Specificity = D/(B+D)
+#' - Prevalence = (A+C)/(A+B+C+D)
+#' - PPV = (sensitivity * prevalence)/((sensitivity*prevalence) + ((1-specificity)*(1-prevalence)))
+#' - NPV = (specificity * (1-prevalence))/(((1-sensitivity)*prevalence) + ((specificity)*(1-prevalence)))
+#' - Detection Rate = A/(A+B+C+D)
+#' - Detection Prevalence = (A+B)/(A+B+C+D)
+#' - Balanced Accuracy = (sensitivity+specificity)/2
+#' - Precision = A/(A+B)
+#' - Recall = A/(A+C)
+#' - F1 = (1+beta^2)*precision*recall/((beta^2 * precision)+recall)
+#' 
 ## ----echo=FALSE-------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 matrix_baseline$byClass %>%
   as_tibble() %>%
@@ -530,7 +629,17 @@ matrix_baseline$byClass %>%
   kable() %>%
   kable_styling("striped", full_width = FALSE)
 
-
+#' 
+#' ## Robust Contrasts with Confidence Intervals
+#' 
+#' https://www.researchgate.net/publication/282206980_nparcomp_An_R_Software_Package_for_Nonparametric_Multiple_Comparisons_and_Simultaneous_Confidence_Intervals 
+#' The R package nparcomp implements a broad range of rank-based nonparametric methods for multiple comparisons. 
+#' The single step procedures provide local test decisions in terms of multiplicity adjusted p-values and simultaneous conﬁdence intervals. 
+#' The null hypothesis H0: p = 1/2 is significantly rejected at 5% level of significance for many pairwise comparisons.
+#' Whenever the p-Value is < than 5% = the confidence interval contains 0.5 -> the effect from the factor trap is not statistically meaningful.
+#' The Estimator can also be interpreted as a proxy for the relative difference in median between Model and Measurements.
+#' If the Estimator is > 0.5 then the second trap tends to have larger measurements.
+#' 
 ## ----echo=FALSE-------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 npar_contr <- map(species$taxon[-3], ~
