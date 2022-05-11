@@ -1,4 +1,4 @@
-#' --- test change!!
+#' ---
 #' title: "A real-time calibration method for the numerical pollen forecast model COSMO-ART"
 #' author: "Simon Adamov & Andreas Pauling"
 #' date: "`r format(Sys.Date(), '%B %d, %Y')`"
@@ -271,6 +271,7 @@ sd_hirst <- data_timeseries %>%
   coord_flip() +
   labs(x = "Occurence of Pollen Concentrations", y = "Log Mean Conc. [Pollen/m³]"))
 
+paa: What is the motivation for these plots (except the timeseries)? 
 
 #' 
 ## ----echo=FALSE, fig.height = 8, fig.width = 13, fig.dpi=300, out.width="100%"----------------------------------------------------------------------------------------------------------
@@ -283,7 +284,7 @@ ggarrange(ggarrange(gg1, gg2, nrow = 2), gg3) %>%
 #' The correlation between the Model and Measurements can be calculated easily and then the CI and p-values must be adjusted for multiple comparison.
 #' The corr-test function from the psych handily offers this functionality.
 #' 
-#' Careful the correlation coefficients method have some serious shortcomings:
+#' Careful the correlation coefficients method have some serious shortcomings: paa: Thats why we usually look at the Bias and the (debiased) standard deviation of the error separately. This may make sense in our case as well because step two of the calibration is actually sort of debiasing. By looking at the bias we can assess if this was successful.
 #' 
 #' The correlation coefficient measures linear agreement--whether the measurements go up-and-down together. Certainly, we want the measures to go up-and-down together, but the correlation coefficient itself is deficient in at least three ways as a measure of agreement. (http://www.jerrydallal.com/LHSP/compare.htm)
 #' 
@@ -313,7 +314,9 @@ corr_matrix <- map(methods, ~ corr.test(
   ci = TRUE,
   minlength = 5
 ))
-
+paa: The two data clouds look quite similar, the improvement is hard to see...
+As our focus is the improvement with reference to the baseline we should use plots that make the differences visible. Maybe plot the correlation coefficients (or other metrics) uncluding uncertainty (boxplots) by station? 
+At a certain point we may also want to include a (difference?) map. 
 #' 
 ## ----include=FALSE----------------------------------------------------------------------------------------------------------------------------------------------------------------------
 ci <- map(corr_matrix, ~ .x %>%
@@ -444,12 +447,12 @@ gg_ab2 <- data_altman %>%
   agreement between Model and Measurements of zero. The dashed red line shows the 2 * sd of the differences, where we expect the points to lie within.",
     face = "italic", size = 12
   )))
-
+paa: Visually, the two plots are almost the same. I would conclude from the distribution of the points that the effect of the calibration is minimal. How to interpret the number (or fraction) of points outside 2sd? Is it a lot? What would we conclude? The Loess smoother is quite different though. What does this tell us? Is the large difference due to very few data points in the Baseline plot that pull the Loess smoother down? 
 
 #' 
 #' ## Density Plots
 #' 
-#' These plots allow to observe the error for different concentration categories.
+#' These plots allow to observe the error for different concentration categories. paa: distribution error, or difference regarding distribution?
 #' 
 ## ----include=FALSE----------------------------------------------------------------------------------------------------------------------------------------------------------------------
 categs <- c("weak", "medium", "strong", "verystrong")
@@ -504,13 +507,13 @@ for (j in categs) {
       size = 10
     )
   ))
-
+paa: What is the x-axis? What do you mean by "three traps"? I think I dont understand these plots (yet).
 
 #' 
 #' 
 #' ## Statistical Assessment
 #' 
-#' First, various metrics are compared where the pollen concentrations are considered a continuous numerical variable.
+#' First, various metrics are compared where the pollen concentrations are considered a continuous numerical variable. paa: These are the overall scores. I think it would be good at least for us to know what the individual results for species / stations / years are. E.g. to know if there are outliers/other features. Are Davos/La-Chaux-de-Fonds also included in the anaylsis? Is it possible to calculate these scores individually?
 #' 
 ## ----echo=FALSE-------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 metrics_baseline <- data_above10 %>%
@@ -558,7 +561,9 @@ metrics_baseline %>%
 #' The Kappa metric is explained here and was chosen as the most meaningful metric for this analysis:
 #' https://towardsdatascience.com/multi-class-metrics-made-simple-the-kappa-score-aka-cohens-kappa-coefficient-bdea137af09c
 #' 
-## ----echo=FALSE-------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+##paa: How about MAE applied to categorised concentrations? That accounts for "how bad the forecast was" if the correct class wasnt hit. This is important information which is not captured by Kappa and would be a very impact-oriented metric. An excellent overview of metrics and their features: https://www.cawcr.gov.au/projects/verification/
+
+ ----echo=FALSE-------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 matrix_baseline <- confusionMatrix(
   data_impact_categories$categories_baseline,
   data_impact_categories$categories_measurement
@@ -629,18 +634,25 @@ matrix_baseline$byClass %>%
   kable() %>%
   kable_styling("striped", full_width = FALSE)
 
+paa: I think we should only include metrics that are a) meaningful for our research questions and b) discussed in the text (interpretation, e.g. what value means what, and if possible relevance for the forecast applications). This naturally limits the number of metrics. https://www.cawcr.gov.au/projects/verification/ is very helpful in that respect.
+
+
 #' 
 #' ## Robust Contrasts with Confidence Intervals
 #' 
 #' https://www.researchgate.net/publication/282206980_nparcomp_An_R_Software_Package_for_Nonparametric_Multiple_Comparisons_and_Simultaneous_Confidence_Intervals 
-#' The R package nparcomp implements a broad range of rank-based nonparametric methods for multiple comparisons. 
+#' The R package nparcomp implements a broad range of rank-based nonparametric methods for multiple comparisons. paa: what is compared?
 #' The single step procedures provide local test decisions in terms of multiplicity adjusted p-values and simultaneous conﬁdence intervals. 
-#' The null hypothesis H0: p = 1/2 is significantly rejected at 5% level of significance for many pairwise comparisons.
-#' Whenever the p-Value is < than 5% = the confidence interval contains 0.5 -> the effect from the factor trap is not statistically meaningful.
-#' The Estimator can also be interpreted as a proxy for the relative difference in median between Model and Measurements.
+#' The null hypothesis H0: p = 1/2 is significantly rejected at 5% level of significance for many pairwise comparisons. paa: what does p=1/2 mean? What is p?
+#' Whenever the p-Value is < than 5% = the confidence interval contains 0.5 -> the effect from the factor trap is not statistically meaningful. paa: What is a factor trap?
+#' The Estimator can also be interpreted as a proxy for the relative difference in median between Model and Measurements. paa: we are interested in the difference between the two model-obs differences. Can this method handle that?
 #' If the Estimator is > 0.5 then the second trap tends to have larger measurements.
 #' 
-## ----echo=FALSE-------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+##
+
+paa: that sounds like a very interesting approach that seems to be suited for our research questions. I will need some discussion to really understand what is analysed ;-)
+
+ ----echo=FALSE-------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 npar_contr <- map(species$taxon[-3], ~
   nparcomp(
@@ -675,4 +687,6 @@ npar_contr[[1]]$Analysis %>%
   kable(escape = FALSE) %>%
   kable_styling("striped", full_width = FALSE) %>%
   add_header_above(myheader)
+
+
 
