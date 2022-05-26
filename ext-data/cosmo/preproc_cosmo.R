@@ -29,7 +29,7 @@ data_cosmo <- data_baseline %>%
   # There has been a pollen explosion during those days with absurdly high values in the baseline
   mutate(value = if_else(
     taxon == "Alnus" &
-      between(date, as.Date("2021-01-10"), as.Date("2021-01-12")),
+      between(date, as.Date("2021-01-10"), as.Date("2021-01-13")),
     0,
     value
   )) %>%

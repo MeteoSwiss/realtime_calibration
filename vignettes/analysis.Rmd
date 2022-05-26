@@ -215,21 +215,21 @@ data_timeseries <-
   data_combined %>%
   filter(
     between(date, as.Date("2020-01-15"), as.Date("2020-04-01")),
-    station == "Zürich",
+    station == "Basel",
     taxon == "Alnus"
   )
 
-gg1 <- data_timeseries %>%
+(gg1 <- data_timeseries %>%
   ggplot(aes(x = datetime)) +
   geom_line(aes(y = value, col = type), alpha = 0.8) +
   labs(y = "Mean Conc. [Pollen/m³]", x = "") +
   theme(legend.position = "none") +
-  scale_color_manual(values = col_hex)
+  scale_color_manual(values = col_hex))
 ```
 
 
 ```{r include=FALSE}
-gg2 <- data_timeseries %>%
+(gg2 <- data_timeseries %>%
   ggplot() +
   geom_boxplot(aes(y = log10(value), fill = type)) +
   theme(
@@ -238,7 +238,7 @@ gg2 <- data_timeseries %>%
     axis.text.x = element_blank()
   ) +
   labs(y = "Log Mean Conc. [Pollen/m³]", x = "") +
-  scale_fill_manual(values = col_hex)
+  scale_fill_manual(values = col_hex))
 ```
 
 ```{r include=FALSE}
@@ -301,6 +301,7 @@ methods <- c("pearson", "spearman", "kendall")
 # it doesn't matter whether the transformed data is used or the original
 
 data_corr <- data_log10 %>%
+  filter(taxon == "Alnus") %>%
   pivot_wider(names_from = type) %>%
   select(datetime, measurement, baseline, calibration)
 

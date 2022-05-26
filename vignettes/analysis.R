@@ -52,6 +52,8 @@ col_names <- c("measurement", "baseline", "calibration")
 col_hex <- c("#3b3a3a", "#e98962", "#66C2A5")
 names(col_hex) <- col_names
 
+DAVOS OUT! Check Visp and LCHF
+Leave in <10 for the first plots and then remove for statistical analysis
 #' 
 #' 
 ## ----include=FALSE----------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -272,7 +274,7 @@ sd_hirst <- data_timeseries %>%
   labs(x = "Occurence of Pollen Concentrations", y = "Log Mean Conc. [Pollen/m³]"))
 
 paa: What is the motivation for these plots (except the timeseries)? 
-
+remove line-plot and create the other two types for all species separately, but all stations
 #' 
 ## ----echo=FALSE, fig.height = 8, fig.width = 13, fig.dpi=300, out.width="100%"----------------------------------------------------------------------------------------------------------
 ggarrange(ggarrange(gg1, gg2, nrow = 2), gg3) %>%
@@ -317,6 +319,8 @@ corr_matrix <- map(methods, ~ corr.test(
 paa: The two data clouds look quite similar, the improvement is hard to see...
 As our focus is the improvement with reference to the baseline we should use plots that make the differences visible. Maybe plot the correlation coefficients (or other metrics) uncluding uncertainty (boxplots) by station? 
 At a certain point we may also want to include a (difference?) map. 
+
+Make this art specific! as everything else in paper. every species gets one color. Adjust Alphas, less smoother more points.
 #' 
 ## ----include=FALSE----------------------------------------------------------------------------------------------------------------------------------------------------------------------
 ci <- map(corr_matrix, ~ .x %>%
@@ -448,11 +452,12 @@ gg_ab2 <- data_altman %>%
     face = "italic", size = 12
   )))
 paa: Visually, the two plots are almost the same. I would conclude from the distribution of the points that the effect of the calibration is minimal. How to interpret the number (or fraction) of points outside 2sd? Is it a lot? What would we conclude? The Loess smoother is quite different though. What does this tell us? Is the large difference due to very few data points in the Baseline plot that pull the Loess smoother down? 
+Make sure you are not zooming but limiting the x and y axis here!
 
 #' 
 #' ## Density Plots
 #' 
-#' These plots allow to observe the error for different concentration categories. paa: distribution error, or difference regarding distribution?
+#' These plots allow to observe the difference regarding distribution for various concentration categories. paa: distribution error, or difference regarding distribution?
 #' 
 ## ----include=FALSE----------------------------------------------------------------------------------------------------------------------------------------------------------------------
 categs <- c("weak", "medium", "strong", "verystrong")
@@ -508,12 +513,20 @@ for (j in categs) {
     )
   ))
 paa: What is the x-axis? What do you mean by "three traps"? I think I dont understand these plots (yet).
-
+Do it for th species seperately. Add a Boxplot instead with information abut different categories.
+And the Paper1 plot with the rel.error of both model compared to Hirst.
+Use the Measurements to define the category of each day!
 #' 
 #' 
 #' ## Statistical Assessment
 #' 
-#' First, various metrics are compared where the pollen concentrations are considered a continuous numerical variable. paa: These are the overall scores. I think it would be good at least for us to know what the individual results for species / stations / years are. E.g. to know if there are outliers/other features. Are Davos/La-Chaux-de-Fonds also included in the anaylsis? Is it possible to calculate these scores individually?
+#' First, various metrics are compared where the pollen concentrations are considered a continuous numerical variable. 
+#' paa: These are the overall scores. I think it would be good at least for us to know what the individual results for species / stations / years are. 
+#' E.g. to know if there are outliers/other features. 
+#' Are Davos/La-Chaux-de-Fonds also included in the anaylsis? Is it possible to calculate these scores individually?
+#' 
+#' We certainly can do species individually + years seperate and combined, and stations only if smth look very much out of line.
+#' Calculate the scores for LCH seperately
 #' 
 ## ----echo=FALSE-------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 metrics_baseline <- data_above10 %>%
@@ -561,7 +574,14 @@ metrics_baseline %>%
 #' The Kappa metric is explained here and was chosen as the most meaningful metric for this analysis:
 #' https://towardsdatascience.com/multi-class-metrics-made-simple-the-kappa-score-aka-cohens-kappa-coefficient-bdea137af09c
 #' 
-##paa: How about MAE applied to categorised concentrations? That accounts for "how bad the forecast was" if the correct class wasnt hit. This is important information which is not captured by Kappa and would be a very impact-oriented metric. An excellent overview of metrics and their features: https://www.cawcr.gov.au/projects/verification/
+##paa: How about MAE applied to categorised concentrations? 
+That accounts for "how bad the forecast was" if the correct class wasnt hit. 
+This is important information which is not captured by Kappa and would be a very impact-oriented metric. 
+An excellent overview of metrics and their features: https://www.cawcr.gov.au/projects/verification/
+
+remove RMSE and MSLE
+seperate plots for categories: Accuracy, MAE for classes (1-4), Kappa
+
 
  ----echo=FALSE-------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 matrix_baseline <- confusionMatrix(
@@ -613,6 +633,7 @@ kappa_baseline %>%
 #' - Recall = A/(A+C)
 #' - F1 = (1+beta^2)*precision*recall/((beta^2 * precision)+recall)
 #' 
+#' 
 ## ----echo=FALSE-------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 matrix_baseline$byClass %>%
   as_tibble() %>%
@@ -634,9 +655,12 @@ matrix_baseline$byClass %>%
   kable() %>%
   kable_styling("striped", full_width = FALSE)
 
-paa: I think we should only include metrics that are a) meaningful for our research questions and b) discussed in the text (interpretation, e.g. what value means what, and if possible relevance for the forecast applications). This naturally limits the number of metrics. https://www.cawcr.gov.au/projects/verification/ is very helpful in that respect.
+paa: I think we should only include metrics that are a) meaningful for our research questions and 
+b) discussed in the text (interpretation, e.g. what value means what, and if possible relevance for 
+the forecast applications). This naturally limits the number of metrics. https://www.cawcr.gov.au/projects/verification/ 
+is very helpful in that respect.
 
-
+Here we only use F-Score for now, and try to understand it in a multi-class settings
 #' 
 #' ## Robust Contrasts with Confidence Intervals
 #' 
@@ -650,7 +674,10 @@ paa: I think we should only include metrics that are a) meaningful for our resea
 #' 
 ##
 
-paa: that sounds like a very interesting approach that seems to be suited for our research questions. I will need some discussion to really understand what is analysed ;-)
+paa: that sounds like a very interesting approach that seems to be suited for our research questions. 
+I will need some discussion to really understand what is analysed ;-)
+
+Understand the outcome besser
 
  ----echo=FALSE-------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
