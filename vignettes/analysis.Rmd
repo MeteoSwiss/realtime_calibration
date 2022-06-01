@@ -14,7 +14,7 @@ output:
 # THE USER CAN SELECT A SPECIES HERE!
 # Alnus, Betula, Corylus or Poaceae (Alder, Birch, Hazel or Grasses)
 
-species_sel <- "Alnus"
+species_sel <- "Poaceae"
 ```
 
 In this project we want to evaluate the new pollen forecast module that uses "realtime data"
@@ -715,7 +715,7 @@ npar_contr <-
 title <- paste(
   "Robust Contrasts and Confidence Intervals for", species_sel, "Measurements"
 )
-myheader <- c(title = 8)
+myheader <- c(title = 6)
 names(myheader) <- title
 
 npar_contr$Analysis %>%
