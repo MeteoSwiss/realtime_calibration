@@ -1,5 +1,5 @@
-if (Sys.getenv("HOME") != "/home/jovyan") {
-
+if (Sys.getenv("HOME") != "/home/jovyan" &
+  file.exists(paste0(getwd(), "/.vscode"))) {
   Sys.setenv(TERM_PROGRAM = "vscode")
   Sys.setenv(DOWNLOAD_STATIC_LIBV8 = 1)
   source(file.path(
