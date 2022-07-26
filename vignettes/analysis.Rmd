@@ -14,7 +14,7 @@ output:
 # THE USER CAN SELECT A SPECIES HERE!
 # Alnus, Betula, Corylus or Poaceae (Alder, Birch, Hazel or Grasses)
 
-species_sel <- "Poaceae"
+species_sel <- "Alnus"
 ```
 
 In this project we want to evaluate the new pollen forecast module that uses "realtime data"
