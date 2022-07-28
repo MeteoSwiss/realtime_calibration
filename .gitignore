@@ -8,3 +8,4 @@ ext-data/dwh/pollen_dwh_daily.txt
 ext-data/dwh/pollen_dwh_hourly.txt
 .vscode/launch.json
 .Rprofile
+gg_*
