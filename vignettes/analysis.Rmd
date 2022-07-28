@@ -348,32 +348,36 @@ ci <- map(corr_matrix, ~ .x %>%
     metric = rep(c("R-", "rho-", "tau-"), each = 3),
     label = tools::toTitleCase(paste0(metric, method, ": ", lower, " - ", upper)),
     comparison = rep(c("mb", "mc", "bc"), times = 3),
-    x = rep(c(0.4, 0.41, 0.4), each = 3),
-    y = rep(c(0.01, 0.04, 0.07), each = 3)
+    x = rep(c(2.5, 2.55, 2.5), each = 3),
+    y = rep(c(1, 1.15, 1.3), each = 3)
   )
 
 ```
 
 ```{r include=FALSE}
 gg_corr1 <- data_corr %>%
-  ggplot(aes(x = log10(measurement), y = log10(baseline))) +
+  ggplot(aes(x = measurement, y = baseline)) +
   geom_point(alpha = 0.3, col = "#222225") +
-  xlim(0, 0.5) +
-  ylim(0, 0.5) +
+  xlim(1, 3) +
+  ylim(1, 3.5) +
   geom_smooth(data = data_corr, alpha = 0.2, col = "#3081b8", fill = "#74cbee") +
   geom_abline(slope = 1, intercept = 0, col = "#cc2d2d") +
-  geom_label(data = ci %>% filter(comparison == "mb"), aes(label = label, x = x, y = y), parse = TRUE) 
+  geom_label(data = ci %>% filter(comparison == "mb"), aes(label = label, x = x, y = y), parse = TRUE) +
+  xlab("log10(measurement)") +
+  ylab("log10(baseline)")
 ```
 
 ```{r include=FALSE}
 gg_corr2 <- data_corr %>%
-  ggplot(aes(x = log10(measurement), y = log10(calibration))) +
+  ggplot(aes(x = measurement, y = calibration)) +
   geom_point(alpha = 0.3, col = "#222225") +
-  xlim(0, 0.5) +
-  ylim(0, 0.5) +
+  xlim(1, 3) +
+  ylim(1, 3.5) +
   geom_smooth(data = data_corr, alpha = 0.2, col = "#3081b8", fill = "#74cbee") +
   geom_abline(slope = 1, intercept = 0, col = "#cc2d2d") +
-  geom_label(data = ci %>% filter(comparison == "mc"), aes(label = label, x = x, y = y), parse = TRUE)
+  geom_label(data = ci %>% filter(comparison == "mc"), aes(label = label, x = x, y = y), parse = TRUE) +
+  xlab("log10(measurement)") +
+  ylab("log10(calibration)")
 ```
 
 
@@ -382,7 +386,7 @@ gg_corr2 <- data_corr %>%
   annotate_figure(
     top = text_grob(paste0("Pairwise Correlation Between Model and Measurements for ", species_sel, " Pollen"), size = 14),
     # bottom = text_grob("Pairwise correlation between Models; blue line shows the Loess smoother; 
-    # the red line shows a theroratical perfect correlation of 1. In the text box one can see the 95% 
+    # the red line shows a theoretical perfect correlation of 1. In the text box one can see the 95% 
     # confidence intervals of the R-values (adjusted for multiple comparison) as obtained by Pearson and two robust methods.",
     # face = "italic", size = 10)
     )
@@ -446,7 +450,7 @@ gg_ab2 <- data_altman %>%
 ```{r echo=FALSE, fig.height = 8, fig.width = 13, fig.dpi=300, out.width="100%"}
 (gg_ab <- ggarrange(gg_ab1, gg_ab2, ncol = 2) %>%
   annotate_figure(top = text_grob(paste0("Altman-Bland Plots for ", species_sel), size = 14), 
-  # bottom = text_grob("Pairwise comparison of Models; blue line shows the Loess smother; the red line shows a theroratical perfect
+  # bottom = text_grob("Pairwise comparison of Models; blue line shows the Loess smother; the red line shows a theoretical perfect
   # agreement between Model and Measurements of zero. The dashed red line shows the 2 * sd of the differences, where we expect the points to lie within.",
   #   face = "italic", size = 12)
   ))
@@ -749,7 +753,7 @@ The single step procedures provide local test decisions in terms of multiplicity
 The null hypothesis H0: p = 1/2 is significantly rejected at 5% level of significance for many pairwise comparisons.
 Whenever the p-Value is < than 5% = the confidence interval contains 0.5 -> the effect from the factor trap is not statistically meaningful.
 The Estimator can also be interpreted as a proxy for the relative difference in median between Model and Measurements.
-If the Estimator is > 0.5 then the second trap tends to have larger measurements.
+If the Estimator is > 0.5 then the model tends to have larger measurements.
 
 ```{r echo=FALSE}
 
@@ -786,7 +790,7 @@ npar_contr$Analysis %>%
 # Export plots for paper
 ggsave("gg_timeseries.png", gg_timeseries, width = 9, height = 6, bg = "white", dpi = 300)
 ggsave("gg_boxplot.png", gg_boxplot, width = 9, height = 7, bg = "white", dpi = 300)
-ggsave("gg_corr.png", gg_corr, width = 11, height = 6, bg = "white", dpi = 300)
+ggsave("gg_corr.png", gg_corr, width = 10, height = 6, bg = "white", dpi = 300)
 ggsave("gg_ab.png", gg_ab, width = 10, height = 6, bg = "white", dpi = 300)
 ggsave("gg_boxplot_conc.png", gg_boxplot_conc, width = 9, height = 7, bg = "white", dpi = 300)
 
