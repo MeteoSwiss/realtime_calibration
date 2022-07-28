@@ -1,7 +1,7 @@
 #' ---
 #' title: "A real-time calibration method for the numerical pollen forecast model COSMO-ART"
 #' author: "Simon Adamov & Andreas Pauling"
-#' date: "`r format(Sys.Date(), '%B %d, %Y')`"
+#' date: "`r format(Sys.lubridate::date(), '%B %d, %Y')`"
 #' always_allow_html: TRUE
 #' output:
 #'   html_document:
