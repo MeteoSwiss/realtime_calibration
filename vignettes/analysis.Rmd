@@ -1,7 +1,7 @@
 ---
 title: "A real-time calibration method for the numerical pollen forecast model COSMO-ART"
 author: "Simon Adamov & Andreas Pauling"
-date: "`r format(Sys.Date(), '%B %d, %Y')`"
+date: "`r format(Sys.ymd_hms(), '%B %d, %Y')`"
 always_allow_html: TRUE
 output:
   html_document:
@@ -21,10 +21,10 @@ In this project we want to evaluate the new pollen forecast module that uses "re
 for calibration. As new automatic pollen monitors are being deployed, realtime calibration
 of pollen forecast from weather models becomes more and more relevant.
 
-This study uses old measurements and weather model reforcasts to investigate various
+This study uses old Hirst measurements and weather model reforcasts to investigate various
 implementations and possibilities in terms of forecast improvements.
 
-For very detailed information about the final implementation in COSMO-1E please refer to this 
+For detailed information about the final implementation in COSMO-1E please refer to this 
 documentation page (ask meteoswiss for access): https://service.meteoswiss.ch/confluence/x/dYQYBQ
 
 ```{r include=FALSE}
@@ -48,15 +48,16 @@ library(nparcomp)
 library(conflicted)
 conflict_prefer("select", "dplyr")
 conflict_prefer("filter", "dplyr")
+conflict_prefer("date", "lubridate")
 
 devtools::load_all()
 ```
 
 ```{r include=FALSE}
 # Main colors for the analysis
-theme_set(theme_minimal(base_size = 14))
+theme_set(theme_minimal(base_size = 12))
 col_names <- c("measurement", "baseline", "calibration")
-col_hex <- c("#3b3a3a", "#e98962", "#66C2A5")
+col_hex <- c("#3b3a3a", "#f16863", "#58c9dd")
 names(col_hex) <- col_names
 ```
 
@@ -83,7 +84,7 @@ We have four species available for this analysis:
 - Corylus from for the pollen seasons 2020-2021
 - Poaceae from for the pollen seasons 2019-2020
 
-The analysis will be carried out for each species individually, but all for all stations and years combined.
+The analysis will be carried out for each species individually, but all for all stations and both years combined.
 
 The observations are provided at 14 different stations, whereof one is excluded from the analysis:
 Davos is high up in the mountains and pollen measurements are almost always zero.
@@ -94,25 +95,30 @@ The following settings are crucial and should always be remembered when running 
 - The species of pollen can be assessed individually or combined 
 - The threshold below which Pollen measurements are excluded from the data is set to 10 currently, as they become unreliant
 
-For all statistical analyses the values <10 are removed from all three timeseries.
-For some plots these values are not removed. This will be denoted in the comments and
+For statistical analyses the values < 10 are removed from all three timeseries.
+For analyses carried out for specific health impact based categories (i.e. concentration bins), the values are note removed
+as they usually are contained in one of the defined health impact categories.
+For initial pots to visualize the data these values are not removed. 
+Whether low values <10 were removed are not will be denoted in all figure captions and 
 should allow the reader to get a full picture of the data.
 
 ```{r include=FALSE}
 data_combined <- data_dwh %>%
   pivot_wider(names_from = type) %>%
   inner_join(data_cosmo %>%
-    pivot_wider(names_from = type), by = c("taxon", "station", "date")) %>%
-  select(taxon, station, datetime = datetime.x, date, hour = hour.x, measurement, baseline, calibration) %>%
+    pivot_wider(names_from = type), by = c("taxon", "station", "datetime")) %>%
+  select(taxon, station, datetime, measurement, baseline, calibration) %>%
   pivot_longer(measurement:calibration, names_to = "type", values_to = "value") %>%
-  select(taxon, station, type, value, datetime, date, hour) %>%
+  select(taxon, station, type, value, datetime) %>%
   filter(taxon == species_sel,
-         station != "Davos")
+         station != "Davos") %>%
+  mutate(type = factor(type, ordered = TRUE, levels = c("measurement", "baseline", "calibration")))
 
 data_above10 <- data_combined %>%
   pivot_wider(names_from = type) %>%
   filter(measurement > 10, baseline > 10, calibration > 10) %>%
-  pivot_longer(measurement:calibration, names_to = "type", values_to = "value")
+  pivot_longer(measurement:calibration, names_to = "type", values_to = "value") %>%
+  mutate(type = factor(type, ordered = TRUE, levels = c("measurement", "baseline", "calibration")))
 
 
 data_log10 <- data_above10 %>%
@@ -135,6 +141,7 @@ data_corr <- data_log10 %>%
 
 data_impact_categories <- data_combined %>%
   pivot_wider(names_from = type) %>%
+  filter(!is.na(measurement) & !is.na(baseline) & !is.na(calibration)) %>%
   mutate(
     categories_measurement = case_when(
       taxon == "Alnus" & measurement < 1 ~ "nothing",
@@ -215,28 +222,60 @@ data_impact_categories <- data_combined %>%
 ### Basic Plots
 
 General overview of the daily concentration values as represented in the three timeseries.
+Each plot shows one species in one year. The seperate lines represent individual measurement stations.
+
+```{r }
+
+startdate <- case_when(species_sel == "Betula" ~ ymd_hms("2021-03-01 00:00:00"),
+                       species_sel == "Poaceae" ~ ymd_hms("2020-03-01 00:00:00"),
+                       TRUE ~ ymd_hms("2021-01-01 00:00:00")
+)
+enddate <- case_when(species_sel == "Betula" ~ ymd_hms("2021-05-31 00:00:00"),
+                     species_sel == "Poaceae" ~ ymd_hms("2020-09-30 00:00:00"),
+                     TRUE ~ ymd_hms("2021-03-31 00:00:00")
+)
+
+data_otheryear <- data_combined %>%
+  filter(between(datetime, startdate - years(1), enddate - years(1))) %>%
+  mutate(datetime = datetime + years(1),
+         station = paste0("other", station))
+
+(gg_timeseries <- data_combined %>%
+  filter(taxon == species_sel,
+         between(datetime, startdate, enddate)) %>%
+  bind_rows(data_otheryear) %>%
+  ggplot() +
+    geom_line(aes(x = datetime, y = value, col = type, fill = station), alpha = 0.25) +
+    facet_wrap(~ type, nrow = 3) +
+    theme(legend.position = "none") +
+    scale_color_manual("", values = col_hex) +
+    xlab("") +
+    ylab(paste0("Daily Mean Concentrations [Pollen/m³]")) +
+    ggtitle(paste0("Timeseries of Daily ", species_sel, " Concentrations")))
+```
+
 First as a boxplot and second as a histogram. 
 
 ```{r echo=FALSE}
-(gg1 <- data_log10 %>%
+(gg_boxplot <- data_above10 %>%
   ggplot() +
-  geom_boxplot(aes(y = value, fill = type)) +
+  geom_boxplot(aes(y = value, fill = type), alpha = 0.9) +
   theme(
     legend.position = "bottom",
     axis.ticks.x = element_blank(),
     axis.text.x = element_blank()
   ) +
-  labs(y = "Log Mean Conc. [Pollen/m³]", x = "") +
-  scale_fill_manual(values = col_hex)) +
-  ggtitle(paste0("Boxplot of Daily ", species_sel, " Concentrations"))
+  labs(y = paste0("Daily Mean Concentrations [Pollen/m³]", x = "")) +
+  scale_fill_manual("", values = col_hex) +
+  ggtitle(paste0("Boxplot of Daily ", species_sel, " Concentrations")))
 ```
 
 ```{r echo=FALSE}
-sd_hirst <- data_combined %>%
+sd_hirst <- data_above10 %>%
   group_by(type) %>%
-  summarise(sd = sd(value, na.rm = TRUE))
+  summarise(sd = sd(value))
 
-(gg2 <- data_log10 %>%
+(gg_hist <- data_log10 %>%
   ggplot() +
   geom_histogram(aes(
     y = value,
@@ -309,8 +348,8 @@ ci <- map(corr_matrix, ~ .x %>%
     metric = rep(c("R-", "rho-", "tau-"), each = 3),
     label = tools::toTitleCase(paste0(metric, method, ": ", lower, " - ", upper)),
     comparison = rep(c("mb", "mc", "bc"), times = 3),
-    x = rep(c(0.4, 0.4, 0.41), each = 3),
-    y = rep(c(0.01, 0.03, 0.05), each = 3)
+    x = rep(c(0.4, 0.41, 0.4), each = 3),
+    y = rep(c(0.01, 0.04, 0.07), each = 3)
   )
 
 ```
@@ -341,13 +380,13 @@ gg_corr2 <- data_corr %>%
 ```{r echo=FALSE, fig.height = 8, fig.width = 13, fig.dpi=300, out.width="100%"}
 (gg_corr <- ggarrange(gg_corr1, gg_corr2, ncol = 2) %>%
   annotate_figure(
-    top = paste0("Pairwise Correlation Between Model and Measurements for ", species_sel, " Pollen"),
-    bottom = text_grob("Pairwise correlation between Models; blue line shows the Loess smoother; 
-    the red line shows a theroratical perfect correlation of 1. In the text box one can see the 95% 
-    confidence intervals of the R-values (adjusted for multiple comparison) as obtained by Pearson and two robust methods.",
-      face = "italic", size = 10
+    top = text_grob(paste0("Pairwise Correlation Between Model and Measurements for ", species_sel, " Pollen"), size = 14),
+    # bottom = text_grob("Pairwise correlation between Models; blue line shows the Loess smoother; 
+    # the red line shows a theroratical perfect correlation of 1. In the text box one can see the 95% 
+    # confidence intervals of the R-values (adjusted for multiple comparison) as obtained by Pearson and two robust methods.",
+    # face = "italic", size = 10)
     )
-  ))
+  )
 ```
 
 ## Altman Bland Plots
@@ -365,7 +404,7 @@ sd_diff <- data_altman %>%
 gg_ab1 <- data_altman %>%
   ggplot(aes(x = mean_baseline, y = diff_baseline)) +
   geom_point(alpha = 0.2, col = "#222225") +
-  xlim(0, 1000) +
+  xlim(0, 500) +
   ylim(-sd_diff[2] * 3, sd_diff[2] * 3) +
   geom_abline(
     slope = 0, intercept = 0, alpha = 0.8, col = "#cc2d2d"
@@ -387,7 +426,7 @@ gg_ab1 <- data_altman %>%
 gg_ab2 <- data_altman %>%
   ggplot(aes(x = mean_calibration, y = diff_calibration)) +
   geom_point(alpha = 0.2, col = "#222225") +
-  xlim(0, 1000) +
+  xlim(0, 500) +
   ylim(-sd_diff[2] * 3, sd_diff[2] * 3) +
   geom_abline(
     slope = 0, intercept = 0, alpha = 0.8, col = "#cc2d2d"
@@ -406,10 +445,11 @@ gg_ab2 <- data_altman %>%
 
 ```{r echo=FALSE, fig.height = 8, fig.width = 13, fig.dpi=300, out.width="100%"}
 (gg_ab <- ggarrange(gg_ab1, gg_ab2, ncol = 2) %>%
-  annotate_figure(top = paste0("Altman-Bland Plots for ", species_sel), bottom = text_grob("Pairwise comparison of Models; blue line shows the Loess smother; the red line shows a theroratical perfect
-  agreement between Model and Measurements of zero. The dashed red line shows the 2 * sd of the differences, where we expect the points to lie within.",
-    face = "italic", size = 12
-  )))
+  annotate_figure(top = text_grob(paste0("Altman-Bland Plots for ", species_sel), size = 14), 
+  # bottom = text_grob("Pairwise comparison of Models; blue line shows the Loess smother; the red line shows a theroratical perfect
+  # agreement between Model and Measurements of zero. The dashed red line shows the 2 * sd of the differences, where we expect the points to lie within.",
+  #   face = "italic", size = 12)
+  ))
 
 ```
 
@@ -423,9 +463,10 @@ categs <- c("weak", "medium", "strong", "verystrong")
 gg_conc_dens <- list()
 gg_conc_box <- list()
 
-labels_y <- list(0.1, 0.015, 0.004, 0.002)
+labels_y <- list(0.2, 0.02, 0.0075, 0.002)
 labels_y_hist <- list(15, 13, 10, 10, 7.5, 3)
 xlims <- list(50, 500, 1000, 2000)
+
 names(labels_y) <- categs
 names(xlims) <- categs
 
@@ -445,7 +486,7 @@ for (j in categs) {
       # you'd have to integrate over an interval on your 'y' axis,
       # and that value should never be greater than 1.
       geom_density(aes(x = Concentration, col = type, fill = type), alpha = 0.15) +
-      geom_label(label = obs, aes(x = max(Concentration) * 0.7), y = labels_y[[j]]) +
+      annotate("text", x = xlims[[j]] * 0.6, y = labels_y[[j]], label = obs) +
       scale_colour_manual("", values = col_hex) +
       scale_fill_manual(values = col_hex) +
       coord_cartesian(xlim = c(0, xlims[[j]])) +
@@ -463,9 +504,13 @@ for (j in categs) {
       geom_boxplot(aes(x = Concentration, col = type, fill = type), alpha = 0.15) +
       scale_colour_manual("", values = col_hex) +
       scale_fill_manual(values = col_hex) +
+      annotate("text", x = xlims[[j]] * 0.6, y = 0.35, label = obs) +
       coord_cartesian(xlim = c(0, xlims[[j]])) +
       guides(fill = "none") +
-      ggtitle(j)
+      xlab("Concentration [Pollen/m³]") +
+      ylab("") +
+      ggtitle(j) +
+      theme(axis.text.y = element_blank(), axis.text.y.left = element_blank())
       
   }
 ```
@@ -485,22 +530,20 @@ for (j in categs) {
       face = "italic",
       size = 10
     )
-  ))
+))
 
 ```
 
 ```{r echo=FALSE, fig.height = 8, fig.width = 13, fig.dpi=300, out.width="100%"}
-(gg_dens_box <- ggarrange(plotlist = gg_conc_box, common.legend = TRUE, legend = "bottom") %>%
+(gg_boxplot_conc <- ggarrange(plotlist = gg_conc_box, common.legend = TRUE, legend = "right") %>%
   annotate_figure(
-    top = paste(
-      "Comparison of Measurements and Model Predictions for ", species_sel,
-      "for All Stations and Different Concentration Groups."
-    ),
-    bottom = text_grob(paste0("We are looking at Boxplots for different health impact groups to
-    investigate the differences between modeled and measured concentrations"),
-      face = "italic",
-      size = 10
-    )
+    top = text_grob(paste(
+      "Model vs. Measurement Boxplot Comparison for Different Health Impact Groups"
+    ), size = 14),
+    # bottom = text_grob(paste0("We are looking at Boxplots for different health impact groups to
+    # investigate the differences between modeled and measured concentrations"),
+    #   face = "italic",
+    #   size = 10)
   ))
 ```
 
@@ -539,7 +582,7 @@ metrics_baseline <- data_above10 %>%
     SD = sd(error),
     MAE = mean(abs(error)),
     RMSE = sqrt(mean((error)^2)),
-    MSLE = mean((log(1 + baseline) - log(1 + measurement))^2, na.rm = TRUE),
+    MSLE = mean((log10(1 + baseline) - log10(1 + measurement))^2, na.rm = TRUE),
     RMSLE = sqrt(MSLE)
   ) %>%
   mutate(type = "baseline")
@@ -556,7 +599,7 @@ metrics_calibration <- data_above10 %>%
     SD = sd(error),
     MAE = mean(abs(error)),
     RMSE = sqrt(mean((error)^2)),
-    MSLE = mean((log(1 + calibration) - log(1 + measurement))^2, na.rm = TRUE),
+    MSLE = mean((log10(1 + calibration) - log10(1 + measurement))^2, na.rm = TRUE),
     RMSLE = sqrt(MSLE)
   ) %>%
   mutate(type = "calibration")
@@ -611,7 +654,7 @@ kappa_baseline %>%
 ```
 
 To takes into account that the health impact levels are ordered. 
-We can treat them as numerical values from 1:weak - 4: very strong.
+We can treat them as numerical values from 0:nothing - 4: very strong.
 
 
 ```{r echo=FALSE}
@@ -624,7 +667,6 @@ data_impact_categories %>%
   mutate(across(categories_measurement:categories_calibration, ~as.numeric(.x)),
   error_baseline = categories_baseline - categories_measurement,
   error_calibration = categories_calibration - categories_measurement) %>%
-  filter(if_any(categories_measurement:categories_calibration, ~ . > 1)) %>%
   summarize(
   MAE_baseline = mean(abs(error_baseline)),
   MAE_calibration = mean(abs(error_calibration))
@@ -657,33 +699,43 @@ The formulas used here are:
 - F1 = (1+beta^2)*precision*recall/((beta^2 * precision)+recall)
 
 ```{r echo=FALSE}
-
 my_header <- c(seciesl_sel = 13)
 names(my_header) <- species_sel
 
 matrix_baseline$byClass %>%
   as_tibble() %>%
   mutate(
-    class = rownames(matrix_baseline$byClass),
+    class = factor(rownames(matrix_baseline$byClass),
+      ordered = TRUE,
+      levels = c(
+        "Class: nothing",
+        "Class: weak",
+        "Class: medium",
+        "Class: strong",
+        "Class: verystrong"
+      )
+    ),
     type = "baseline"
-  ) %>%
-  filter(
-    class != "Class: nothing",
-    class != "Class: weak"
   ) %>%
   bind_rows(
     matrix_calibration$byClass %>%
       as_tibble() %>%
       mutate(
-        class = rownames(matrix_calibration$byClass),
+        class = factor(rownames(matrix_baseline$byClass),
+          ordered = TRUE,
+          levels = c(
+            "Class: nothing",
+            "Class: weak",
+            "Class: medium",
+            "Class: strong",
+            "Class: verystrong"
+          )
+        ),
         type = "calibration"
-      )
-      %>% filter(
-        class != "Class: nothing",
-        class != "Class: weak"
       )
   ) %>%
   mutate(across(c(-class, -type), ~ round(., digits = 3))) %>%
+  arrange(class) %>%
   kable(escape = FALSE) %>%
   kable_styling("striped", full_width = FALSE) %>%
   add_header_above(my_header)
@@ -704,7 +756,7 @@ If the Estimator is > 0.5 then the second trap tends to have larger measurements
 npar_contr <- 
   nparcomp(
     value ~ type,
-    data = data_log10,
+    data = data_above10,
     # slice(1:3870),
     conf.level = 0.95,
     alternative = "two.sided",
@@ -728,4 +780,14 @@ npar_contr$Analysis %>%
   kable(escape = FALSE) %>%
   kable_styling("striped", full_width = FALSE) %>%
   add_header_above(myheader)
+```
+
+```{r paper}
+# Export plots for paper
+ggsave("gg_timeseries.png", gg_timeseries, width = 9, height = 6, bg = "white", dpi = 300)
+ggsave("gg_boxplot.png", gg_boxplot, width = 9, height = 7, bg = "white", dpi = 300)
+ggsave("gg_corr.png", gg_corr, width = 11, height = 6, bg = "white", dpi = 300)
+ggsave("gg_ab.png", gg_ab, width = 10, height = 6, bg = "white", dpi = 300)
+ggsave("gg_boxplot_conc.png", gg_boxplot_conc, width = 9, height = 7, bg = "white", dpi = 300)
+
 ```
