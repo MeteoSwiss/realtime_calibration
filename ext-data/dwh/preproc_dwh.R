@@ -8,6 +8,7 @@ library(readr)
 library(lubridate)
 library(padr)
 library(here)
+
 devtools::load_all()
 
 load(paste0(here(), "/data/other/species.RData"))
@@ -20,10 +21,10 @@ load(paste0(here(), "/data/other/stations.RData"))
 
 data_dwh <- import_data_dwh(paste0(here(), "/ext-data/dwh/pollen_dwh_hourly.txt")) %>%
   filter(
-    taxon == "Alnus" & between(date, as.Date("2020-01-01"), as.Date("2021-12-31")) |
-    taxon == "Betula" & between(date, as.Date("2020-01-01"), as.Date("2021-12-31")) |
-    taxon == "Corylus" & between(date, as.Date("2020-01-01"), as.Date("2021-12-31")) |
-    taxon == "Poaceae" & between(date, as.Date("2019-01-01"), as.Date("2020-12-31"))
+    taxon == "Alnus" & between(datetime, ymd_hms("2020-01-01 00:00:00"), ymd_hms("2021-12-31 00:00:00")) |
+    taxon == "Betula" & between(datetime, ymd_hms("2020-01-01 00:00:00"), ymd_hms("2021-12-31 00:00:00")) |
+    taxon == "Corylus" & between(datetime, ymd_hms("2020-01-01 00:00:00"), ymd_hms("2021-12-31 00:00:00")) |
+    taxon == "Poaceae" & between(datetime, ymd_hms("2019-01-01 00:00:00"), ymd_hms("2020-12-31 00:00:00"))
   ) %>%
   aggregate_pollen() %>%
   impute_pollen()

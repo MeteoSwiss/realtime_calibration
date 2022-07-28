@@ -5,8 +5,6 @@
 
 import_data_cosmo <- function(datapath, type) {
   read_table2(paste(datapath), col_names = TRUE) %>%
-    # setting na during import failed for some reason
-    mutate_at(vars(CHBASE:CHZUER), ~ ifelse(. < 0, NA_real_, .)) %>%
     pivot_longer(CHBASE:CHZUER,
       names_to = "station_tag",
       values_to = "value"
@@ -32,11 +30,9 @@ import_data_cosmo <- function(datapath, type) {
         sprintf("%02d", DD),
         sprintf("%02d", hh)
       )),
-      date = lubridate::date(datetime),
-      hour = lubridate::hour(datetime),
       type = type
     ) %>%
-    select(taxon, station, datetime, date, hour, value, type)
+    select(taxon, station, datetime, value, type)
 }
 
 
@@ -45,7 +41,7 @@ import_data_cosmo <- function(datapath, type) {
 #' @param datapath File path to the txt-file containing the data
 #'
 import_data_dwh <- function(datapath) {
-  cols <- c("station", "type", "value", "datetime", "date", "hour")
+  cols <- c("station", "type", "value", "datetime")
   stn_start <- "PLO"
   stn_end <- "PCF"
   meas <- "concentration"
@@ -62,10 +58,7 @@ import_data_dwh <- function(datapath) {
         YYYY, sprintf("%02d", MM),
         sprintf("%02d", DD),
         sprintf("%02d", HH)
-      )),
-      date = lubridate::date(datetime),
-      hour = lubridate::hour(datetime)
-    ) %>%
+      ))) %>%
     inner_join(species, by = c("PARAMETER" = "cosmo_taxon")) %>%
     inner_join(stations, by = c("station_short" = stn_abbr)) %>%
     select(cols)
@@ -78,34 +71,32 @@ import_data_dwh <- function(datapath) {
 aggregate_pollen <- function(data, level = "daily") {
   if (level == "daily") {
     data %>%
+      mutate(date = lubridate::date(datetime)) %>%
       group_by(taxon, station, date, type) %>%
-      # Values are not averaged per hour but simply retrieved at every hour
       summarise(value = mean(value, na.rm = TRUE)) %>%
       ungroup() %>%
       mutate(
-        hour = 0,
-        # date = date + days(1), # Depends on the definition
-        datetime = ymd_hm(paste0(
+        datetime = ymd_hms(paste0(
           as.character(date),
-          paste0(sprintf("%02d", hour), ":00")
-        ))
-      )
+          "00:00:00"))
+      ) %>%
+      select(-date)
   } else if (level == "12h") {
     data %>%
       mutate(
-        hour = if_else(hour < 12, 12, 0),
-        date = if_else(hour == 0, date + days(1), date)
+        hour = if_else(hour(datetime) < 12, 12, 0),
+        date = if_else(hour == 0, lubridate::date(datetime) + days(1), lubridate::date(datetime))
       ) %>%
       group_by(taxon, station, date, hour, type) %>%
-      # Values are not averaged per hour but simply retrieved at every hour
       summarise(value = mean(value, na.rm = TRUE)) %>%
       ungroup() %>%
       mutate(
-        datetime = ymd_hm(paste0(
+        datetime = ymd_hms(paste0(
           as.character(date),
-          paste0(sprintf("%02d", hour), ":00")
+          paste0(sprintf("%02d", hour), ":00:00")
         ))
-      )
+      ) %>%
+      select(-hour, -date)
   }
 }
 
@@ -132,10 +123,5 @@ impute_pollen <- function(data, min_date = min(data$datetime), max_date = max(da
       group = c("station", "taxon", "type"),
       by = "datetime",
       break_above = 2
-    ) %>%
-    mutate(
-      date = lubridate::date(datetime),
-      hour = lubridate::hour(datetime),
-      value = if_else(is.na(value), 0, value)
     )
 }

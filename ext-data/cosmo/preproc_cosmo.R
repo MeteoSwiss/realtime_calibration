@@ -10,6 +10,7 @@ library(stringr)
 library(lubridate)
 library(padr)
 library(here)
+
 devtools::load_all()
 
 load(paste0(here(), "/data/other/species.RData"))
@@ -29,10 +30,10 @@ data_cosmo <- data_baseline %>%
   # There has been a pollen explosion during those days with absurdly high values in the baseline
   mutate(value = if_else(
     taxon == "Alnus" &
-      between(date, as.Date("2021-01-10"), as.Date("2021-01-13")),
-    0,
+      between(datetime, ymd_hms("2021-01-10 00:00:00"), ymd_hms("2021-01-13 00:00:00")),
+    NA_real_,
     value
   )) %>%
-  select(taxon, station, type, value, datetime, date, hour)
+  select(taxon, station, type, value, datetime)
 
 save(data_cosmo, file = paste0(here(), "/data/cosmo/data_cosmo.RData"))
