@@ -98,7 +98,7 @@ The following settings are crucial and should always be remembered when running 
 For statistical analyses the values < 10 are removed from all three timeseries.
 For analyses carried out for specific health impact based categories (i.e. concentration bins), the values are note removed
 as they usually are contained in one of the defined health impact categories.
-For initial pots to visualize the data these values are not removed. 
+For initial plots to visualize the data these values are not removed. 
 Whether low values <10 were removed are not will be denoted in all figure captions and 
 should allow the reader to get a full picture of the data.
 
@@ -108,6 +108,8 @@ data_combined <- data_dwh %>%
   inner_join(data_cosmo %>%
     pivot_wider(names_from = type), by = c("taxon", "station", "datetime")) %>%
   select(taxon, station, datetime, measurement, baseline, calibration) %>%
+  # Remove timesteps with missing data in observations
+  filter(!is.na(measurement) & !is.na(baseline) & !is.na(calibration)) %>%
   pivot_longer(measurement:calibration, names_to = "type", values_to = "value") %>%
   select(taxon, station, type, value, datetime) %>%
   filter(taxon == species_sel,
@@ -138,10 +140,8 @@ data_corr <- data_log10 %>%
   pivot_wider(names_from = type) %>%
   select(datetime, measurement, baseline, calibration)
 
-
 data_impact_categories <- data_combined %>%
   pivot_wider(names_from = type) %>%
-  filter(!is.na(measurement) & !is.na(baseline) & !is.na(calibration)) %>%
   mutate(
     categories_measurement = case_when(
       taxon == "Alnus" & measurement < 1 ~ "nothing",
@@ -217,6 +217,115 @@ data_impact_categories <- data_combined %>%
 
 ```
 
+## Residual Analysis
+
+First we compare the three data sets with the traditional ANOVA approach. Statistical inference (p-values, confidence intervals, . . . ) 
+is only valid if the model assumptions are fulfilled. So far, this means (many paragraphs are quoted from Lukas Meier ETH - Script Applied Statistics ANOVA Course):
+
+- are the errors independent?
+- are the errors normally distributed?
+- is the error variance constant?
+- do the errors have mean zero?
+
+The first assumption is most crucial (but also most difficult to check). If the independence assumption is
+violated, statistical inference can be very inaccurate. In the ANOVA setting, the last assumption is typically
+not as important compared to a regression setting, as we are typically fitting “large” models.
+
+```{r}
+op <- options(contrasts = c("contr.sum", "contr.poly"))
+fit_anova <- aov(as.formula(paste("value ~ type")), data = data_above10)
+fit_anova_log <- aov(as.formula(paste("value ~ type")), data = data_log10)
+
+```
+
+### Are the errors independent?
+
+In a QQ-plot we plot the empirical quantiles (“what we see in the data”) vs. the theoretical quantiles (“what
+we expect from the model”). The plot should show a more or less straight line if the distributional assumption
+is correct. By default, a standard normal distribution is the theoretical “reference distribution”.
+
+They are definitely not and we have to do some adjustments. So for the following plot we logarithmic the data to deal with the right-skewedness. 
+The best results were achieved by first logarithmic the data and then taking the square root.
+
+```{r }
+gg_res1 <- tibble(residuals = residuals(fit_anova_log, type = "pearson")) %>% 
+  ggplot(aes(sample = residuals)) +
+  stat_qq(col = "#222225", alpha = 0.1) +
+  stat_qq_line(col = "#cc2d2d")
+
+gg_res2 <- tibble(residuals = residuals(fit_anova, type = "pearson")) %>% 
+  ggplot(aes(sample = residuals), col = col_hex[3]) +
+  stat_qq(col = "#222225", alpha = 0.1) +
+  stat_qq_line(col = "#cc2d2d")
+
+ggarrange(gg_res1, gg_res2, nrow = 1) %>% 
+  annotate_figure(top = "QQ-Plot for the ANOVA Residuals With (left) and Without Logarithmizing")
+```
+### Do the errors have mean zero? & Is the error variance constant?
+The Tukey-Anscombe plot plots the residuals vs. the fitted values. 
+It allows us to check whether the residuals have constant variance and whether the residuals have mean zero 
+(i.e. they don’t show any deterministic pattern).
+We don't plot the smoothing line as loess (and other) algorithms have issues when the same value is repeated a large number of times (jitter did not really help).
+
+```{r}
+gg_tukey1 <- tibble(resid = residuals(fit_anova_log, type = "pearson"), fitted = fit_anova_log$fitted.values) %>%
+  ggplot(aes(x = fitted, y = resid)) +
+  geom_point(col = "#222225", alpha = 0.5, position = position_jitter(width = 5, height = 0)) +
+  # geom_smooth(method = "loess", alpha = 0.2, col = "#3081b8", fill = "#74cbee") +
+  geom_abline(slope = 0, intercept = 0, col = "#cc2d2d")
+gg_tukey2 <- 
+  tibble(resid = residuals(fit_anova, type = "pearson"), fitted = fit_anova$fitted.values) %>%
+    ggplot(aes(x = fitted, y = resid)) +
+    geom_point(col = "#222225", alpha = 0.5, position = position_jitter(width = 5, height = 0)) +
+    # geom_smooth(method = "loess", alpha = 0.2, col = "#3081b8", fill = "#74cbee") +
+    geom_abline(slope = 0, intercept = 0, col = "#cc2d2d")
+
+ggarrange(gg_tukey1, gg_tukey2)  %>% 
+  annotate_figure(top = "Tukey Anscombe - Plot for the ANOVA Residuals With (left) and Without Logarithmizing")
+
+```
+
+### Are the errors normally distributed?
+
+If the data has some serial structure (i.e., if observations were recorded in a certain time order), we typically
+want to check whether residuals close in time are more similar than residuals far apart, as this would be a
+violation of the independence assumption. We can do so by using a so-called index plot where we plot the
+residuals against time. For positively dependent residuals we would see time periods where most residuals
+have the same sign, while for negatively dependent residuals, the residuals would “jump” too often from
+positive to negative compared to independent residuals.
+
+```{r}
+resid <- residuals(fit_anova_log, type = "pearson")
+resid_df <- tibble(resid = resid, id = as.numeric(names(resid)))
+
+gg_timeline_log <- tibble(id = 1:nrow(data_log10), time = data_log10$datetime) %>%
+  left_join(resid_df, by = "id") %>% 
+  ggplot(aes(x = time, y = resid)) +
+  geom_point(alpha = 0.3, col = "#222225") +
+  geom_line(alpha = 0.3, col = "#222225")
+
+resid <- residuals(fit_anova, type = "pearson")
+resid_df <- tibble(resid = resid, id = as.numeric(names(resid)))
+
+gg_timeline <- tibble(id = 1:nrow(data_above10), time = data_above10$datetime) %>%
+  left_join(resid_df, by = "id") %>% 
+  ggplot(aes(x = time, y = resid)) +
+  geom_point(alpha = 0.3, col = "#222225") +
+  geom_line(alpha = 0.3, col = "#222225")
+
+gg_timeline_log1 = gg_timeline_log + coord_cartesian(x = c(as.POSIXct("2020-01-01"), as.POSIXct("2020-03-31")))
+gg_timeline_log2 = gg_timeline_log + coord_cartesian(x = c(as.POSIXct("2021-01-01"), as.POSIXct("2021-03-31")))
+gg_timeline1 = gg_timeline + coord_cartesian(x = c(as.POSIXct("2020-01-01"), as.POSIXct("2020-03-31")))
+gg_timeline2 = gg_timeline + coord_cartesian(x = c(as.POSIXct("2021-01-01"), as.POSIXct("2021-03-31")))
+
+ggarrange(gg_timeline_log1, gg_timeline1, gg_timeline_log2, gg_timeline2, nrow = 2, ncol = 2) %>% 
+  annotate_figure(top = "Index-Plot for the ANOVA Residuals With (left) and Without Logarithmizing")
+
+```
+
+Summary: Redidual Analysis shows that the assumptions of "normal" statiscal methods are validated even for log(daily values).
+It is therefore suggested to continue the analysis with robust and simple metrics.
+
 ## Visual Assessment
 
 ### Basic Plots
@@ -266,6 +375,7 @@ First as a boxplot and second as a histogram.
     axis.text.x = element_blank()
   ) +
   labs(y = paste0("Daily Mean Concentrations [Pollen/m³]", x = "")) +
+  coord_cartesian(y = c(0, 1000)) +
   scale_fill_manual("", values = col_hex) +
   ggtitle(paste0("Boxplot of Daily ", species_sel, " Concentrations")))
 ```
@@ -415,11 +525,11 @@ gg_ab1 <- data_altman %>%
   ) +
   geom_abline(
     slope = 0, col = "#cc2d2d",
-    intercept = sd_diff[1] * 2, alpha = 0.8, linetype = 3
+    intercept = sd_diff[1] * 1.96, alpha = 0.8, linetype = 3
   ) +
   geom_abline(
     slope = 0, col = "#cc2d2d",
-    intercept = sd_diff[1] * (-2), alpha = 0.8, linetype = 3
+    intercept = sd_diff[1] * (-1.96), alpha = 0.8, linetype = 3
   ) +
   geom_smooth(alpha = 0.3, col = "#3081b8", fill = "#74cbee") +
   labs(y = "Difference(Baseline - Measurement)", x = "Mean(Baseline, Measurement)")
@@ -437,11 +547,11 @@ gg_ab2 <- data_altman %>%
   ) +
   geom_abline(
     slope = 0, col = "#cc2d2d",
-    intercept = sd_diff[2] * 2, alpha = 0.8, linetype = 3
+    intercept = sd_diff[2] * 1.96, alpha = 0.8, linetype = 3
   ) +
   geom_abline(
     slope = 0, col = "#cc2d2d",
-    intercept = sd_diff[2] * (-2), alpha = 0.8, linetype = 3
+    intercept = sd_diff[2] * (-1.96), alpha = 0.8, linetype = 3
   ) +
   geom_smooth(alpha = 0.3, col = "#3081b8", fill = "#74cbee") +
   labs(y = "Difference(Calibration - Measurement)", x = "Mean(Calibration, Measurement)")

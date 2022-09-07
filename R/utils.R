@@ -73,14 +73,16 @@ aggregate_pollen <- function(data, level = "daily") {
     data %>%
       mutate(date = lubridate::date(datetime)) %>%
       group_by(taxon, station, date, type) %>%
-      summarise(value = mean(value, na.rm = TRUE)) %>%
+      summarise(
+        nas = sum(is.na(value)),
+        value = if_else(nas <= 12, mean(value, na.rm = TRUE), NA_real_)) %>%
       ungroup() %>%
       mutate(
         datetime = ymd_hms(paste0(
           as.character(date),
           "00:00:00"))
       ) %>%
-      select(-date)
+      select(-date, -nas)
   } else if (level == "12h") {
     data %>%
       mutate(
@@ -88,7 +90,9 @@ aggregate_pollen <- function(data, level = "daily") {
         date = if_else(hour == 0, lubridate::date(datetime) + days(1), lubridate::date(datetime))
       ) %>%
       group_by(taxon, station, date, hour, type) %>%
-      summarise(value = mean(value, na.rm = TRUE)) %>%
+      summarise(
+        nas = sum(is.na(value)),
+        value = if_else(nas <= 6, mean(value, na.rm = TRUE), NA_real_)) %>%
       ungroup() %>%
       mutate(
         datetime = ymd_hms(paste0(
@@ -96,32 +100,6 @@ aggregate_pollen <- function(data, level = "daily") {
           paste0(sprintf("%02d", hour), ":00:00")
         ))
       ) %>%
-      select(-hour, -date)
+      select(-hour, -date, -nas)
   }
-}
-
-#' Impute Hourly Data
-#'
-#' @param data Data Frame containing hourly concentrations
-#' @param min_date Beginning of the timeseries in datetime format
-#' @param max_date End of the timeseries in datetime format
-#' @param taxon Unique taxon to impute each one seperately
-
-impute_pollen <- function(data, min_date = min(data$datetime), max_date = max(data$datetime), taxon = unique(data$taxon)) {
-  data %>%
-    filter(
-      between(
-        datetime,
-        min_date,
-        max_date
-      ),
-      taxon %in% taxon
-    ) %>%
-    pad(
-      start_val = min_date,
-      end_val = max_date,
-      group = c("station", "taxon", "type"),
-      by = "datetime",
-      break_above = 2
-    )
 }
