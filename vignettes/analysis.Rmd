@@ -1,7 +1,7 @@
 ---
 title: "A real-time calibration method for the numerical pollen forecast model COSMO-ART"
 author: "Simon Adamov & Andreas Pauling"
-date: "`r format(Sys.ymd_hms(), '%B %d, %Y')`"
+date: "`r format(Sys.Date(), '%B %d, %Y')`"
 always_allow_html: TRUE
 output:
   html_document:
@@ -95,10 +95,15 @@ The following settings are crucial and should always be remembered when running 
 - The species of pollen can be assessed individually or combined 
 - The threshold below which Pollen measurements are excluded from the data is set to 10 currently, as they become unreliant
 
-For statistical analyses the values < 10 are removed from all three timeseries.
-For analyses carried out for specific health impact based categories (i.e. concentration bins), the values are note removed
-as they usually are contained in one of the defined health impact categories.
-For initial plots to visualize the data these values are not removed. 
+Observations of low pollen concentrations are uncertain. Therefore, times-
+tamps with modelled or measured values < 10 m-3 are removed from all three
+data sets for the numerical analysis. This symmetrical exclusion is necessary to
+make sure that no artificial biases are introduced. For the analyses carried out for
+specific health impact based categories (i.e. concentration bins), timestamps with
+measured values < 10 m-3 are removed only (i.e. modelled values are allowed
+to be < 10 m-3. This asymmetrical exclusion is justified for the investigation of
+relative changes in categorical metrics. In the time series plot (Figure 1) and the
+boxplot (Figure 5) values < 10 are not removed at all for better visibility.
 Whether low values <10 were removed are not will be denoted in all figure captions and 
 should allow the reader to get a full picture of the data.
 
@@ -214,6 +219,9 @@ data_impact_categories <- data_combined %>%
     vars(categories_measurement, categories_baseline, categories_calibration),
     ~ factor(., levels = c("nothing", "weak", "medium", "strong", "verystrong"))
   )
+
+data_impact_categories_above10 <- data_impact_categories  %>%
+  filter(measurement > 10)
 
 ```
 
@@ -354,10 +362,11 @@ data_otheryear <- data_combined %>%
          between(datetime, startdate, enddate)) %>%
   bind_rows(data_otheryear) %>%
   ggplot() +
-    geom_line(aes(x = datetime, y = value, col = type, fill = station), alpha = 0.25) +
+    geom_line(aes(x = as.Date(datetime), y = value, col = type, fill = station), alpha = 0.25) +
     facet_wrap(~ type, nrow = 3) +
     theme(legend.position = "none") +
     scale_color_manual("", values = col_hex) +
+    scale_x_date(date_labels = "%d. %b") +
     xlab("") +
     ylab(paste0("Daily Mean Concentrations [Pollen/m³]")) +
     ggtitle(paste0("Timeseries of Daily ", species_sel, " Concentrations")))
@@ -735,8 +744,8 @@ https://towardsdatascience.com/multi-class-metrics-made-simple-the-kappa-score-a
 
 ```{r echo=FALSE}
 matrix_baseline <- confusionMatrix(
-  data_impact_categories$categories_baseline,
-  data_impact_categories$categories_measurement
+  data_impact_categories_above10$categories_baseline,
+  data_impact_categories_above10$categories_measurement
 )
 kappa_baseline <- matrix_baseline$overall[1:2] %>%
   tibble() %>%
@@ -746,8 +755,8 @@ kappa_baseline <- matrix_baseline$overall[1:2] %>%
   )
 
 matrix_calibration <- confusionMatrix(
-  data_impact_categories$categories_calibration,
-  data_impact_categories$categories_measurement
+  data_impact_categories_above10$categories_calibration,
+  data_impact_categories_above10$categories_measurement
 )
 kappa_calibration <- matrix_calibration$overall[1:2] %>%
   tibble() %>%
@@ -776,7 +785,7 @@ We can treat them as numerical values from 0:nothing - 4: very strong.
 my_header <- c(seciesl_sel = 2)
 names(my_header) <- species_sel
 
-data_impact_categories %>%
+data_impact_categories_above10 %>%
   select(taxon, station, datetime, categories_measurement, categories_baseline, categories_calibration) %>%
   mutate(across(categories_measurement:categories_calibration, ~as.numeric(.x)),
   error_baseline = categories_baseline - categories_measurement,
