@@ -26,7 +26,14 @@ data_cosmo <- data_baseline %>%
   c(data_calibration) %>%
   bind_rows() %>%
   aggregate_pollen() %>%
-  impute_pollen() %>%
+  group_split(taxon, year(datetime)) %>%
+  map( ~ .x %>%
+    pad(
+      group = c("station", "taxon", "type"),
+      by = "datetime",
+      break_above = 2)
+  ) %>%
+  bind_rows() %>%
   # There has been a pollen explosion during those days with absurdly high values in the baseline
   mutate(value = if_else(
     taxon == "Alnus" &

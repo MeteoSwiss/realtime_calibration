@@ -27,6 +27,14 @@ data_dwh <- import_data_dwh(paste0(here(), "/ext-data/dwh/pollen_dwh_hourly.txt"
     taxon == "Poaceae" & between(datetime, ymd_hms("2019-01-01 00:00:00"), ymd_hms("2020-12-31 00:00:00"))
   ) %>%
   aggregate_pollen() %>%
-  impute_pollen()
+  group_split(taxon, year(datetime)) %>%
+  map( ~ .x %>%
+    pad(
+      group = c("station", "taxon", "type"),
+      by = "datetime",
+      break_above = 2)
+  ) %>%
+  bind_rows() %>%
+  select(taxon, station, type, value, datetime)
 
 save(data_dwh, file = paste0(here(), "/data/dwh/data_dwh.RData"))
