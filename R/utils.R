@@ -2,6 +2,7 @@
 #'
 #' @param datapath File path to the txt-file containing the data
 #' @param type Hirst, Cosmo or Assim
+#' @export
 
 import_data_cosmo <- function(datapath, type) {
   read_table2(paste(datapath), col_names = TRUE) %>%
@@ -39,7 +40,8 @@ import_data_cosmo <- function(datapath, type) {
 #' Retrieve Pollendata from txt-file (DWH)
 #'
 #' @param datapath File path to the txt-file containing the data
-#'
+#' @export
+
 import_data_dwh <- function(datapath) {
   cols <- c("station", "type", "value", "datetime")
   stn_start <- "PLO"
@@ -67,6 +69,7 @@ import_data_dwh <- function(datapath) {
 #' Aggregate Hourly Data into Daily
 #'
 #' @param data Data Frame containing hourly concentrations
+#' @export
 
 aggregate_pollen <- function(data, level = "daily") {
   if (level == "daily") {

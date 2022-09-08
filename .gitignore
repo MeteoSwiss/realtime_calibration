@@ -9,3 +9,9 @@ ext-data/dwh/pollen_dwh_hourly.txt
 .vscode/launch.json
 .Rprofile
 gg_*
+vignettes/analysis.html
+vignettes/test.aux
+vignettes/test.fdb_latexmk
+vignettes/test.fls
+vignettes/test.log
+vignettes/test.tex
