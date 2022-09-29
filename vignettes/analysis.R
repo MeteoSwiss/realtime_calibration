@@ -1,7 +1,7 @@
 #' ---
 #' title: "A real-time calibration method for the numerical pollen forecast model COSMO-ART"
 #' author: "Simon Adamov & Andreas Pauling"
-#' date: "`r format(Sys.lubridate::date(), '%B %d, %Y')`"
+#' date: "`r format(Sys.Date(), '%B %d, %Y')`"
 #' always_allow_html: TRUE
 #' output:
 #'   html_document:
@@ -10,7 +10,7 @@
 #'   word_document: default
 #' ---
 #' 
-## ----------------------------------------------------------------------------------------------------------------------------------------------------------
+## ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 # THE USER CAN SELECT A SPECIES HERE!
 # Alnus, Betula, Corylus or Poaceae (Alder, Birch, Hazel or Grasses)
 
@@ -21,13 +21,13 @@ species_sel <- "Alnus"
 #' for calibration. As new automatic pollen monitors are being deployed, realtime calibration
 #' of pollen forecast from weather models becomes more and more relevant.
 #' 
-#' This study uses old measurements and weather model reforcasts to investigate various
+#' This study uses old Hirst measurements and weather model reforcasts to investigate various
 #' implementations and possibilities in terms of forecast improvements.
 #' 
-#' For very detailed information about the final implementation in COSMO-1E please refer to this 
+#' For detailed information about the final implementation in COSMO-1E please refer to this 
 #' documentation page (ask meteoswiss for access): https://service.meteoswiss.ch/confluence/x/dYQYBQ
 #' 
-## ----include=FALSE-----------------------------------------------------------------------------------------------------------------------------------------
+## ----include=FALSE-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 library(readr)
 library(dplyr)
 library(tidyr)
@@ -48,20 +48,21 @@ library(nparcomp)
 library(conflicted)
 conflict_prefer("select", "dplyr")
 conflict_prefer("filter", "dplyr")
+conflict_prefer("date", "lubridate")
 
 devtools::load_all()
 
 #' 
-## ----include=FALSE-----------------------------------------------------------------------------------------------------------------------------------------
+## ----include=FALSE-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 # Main colors for the analysis
-theme_set(theme_minimal(base_size = 14))
+theme_set(theme_minimal(base_size = 12))
 col_names <- c("measurement", "baseline", "calibration")
-col_hex <- c("#3b3a3a", "#e98962", "#66C2A5")
+col_hex <- c("#3b3a3a", "#f16863", "#58c9dd")
 names(col_hex) <- col_names
 
 #' 
 #' 
-## ----include=FALSE-----------------------------------------------------------------------------------------------------------------------------------------
+## ----include=FALSE-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 load(paste0(here(), "/data/other/species.RData"))
 load(paste0(here(), "/data/other/stations.RData"))
 load(paste0(here(), "/data/cosmo/data_cosmo.RData"))
@@ -83,7 +84,7 @@ load(paste0(here(), "/data/dwh/data_dwh.RData"))
 #' - Corylus from for the pollen seasons 2020-2021
 #' - Poaceae from for the pollen seasons 2019-2020
 #' 
-#' The analysis will be carried out for each species individually, but all for all stations and years combined.
+#' The analysis will be carried out for each species individually, but all for all stations and both years combined.
 #' 
 #' The observations are provided at 14 different stations, whereof one is excluded from the analysis:
 #' Davos is high up in the mountains and pollen measurements are almost always zero.
@@ -94,25 +95,39 @@ load(paste0(here(), "/data/dwh/data_dwh.RData"))
 #' - The species of pollen can be assessed individually or combined 
 #' - The threshold below which Pollen measurements are excluded from the data is set to 10 currently, as they become unreliant
 #' 
-#' For all statistical analyses the values <10 are removed from all three timeseries.
-#' For some plots these values are not removed. This will be denoted in the comments and
+#' Observations of low pollen concentrations are uncertain. Therefore, times-
+#' tamps with modelled or measured values < 10 m-3 are removed from all three
+#' data sets for the numerical analysis. This symmetrical exclusion is necessary to
+#' make sure that no artificial biases are introduced. For the analyses carried out for
+#' specific health impact based categories (i.e. concentration bins), timestamps with
+#' measured values < 10 m-3 are removed only (i.e. modelled values are allowed
+#' to be < 10 m-3. This asymmetrical exclusion is justified for the investigation of
+#' relative changes in categorical metrics. In the time series plot (Figure 1) and the
+#' boxplot (Figure 5) values < 10 are not removed at all for better visibility.
+#' Whether low values <10 were removed are not will be denoted in all figure captions and 
 #' should allow the reader to get a full picture of the data.
 #' 
-## ----include=FALSE-----------------------------------------------------------------------------------------------------------------------------------------
+## ----include=FALSE-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 data_combined <- data_dwh %>%
   pivot_wider(names_from = type) %>%
   inner_join(data_cosmo %>%
-    pivot_wider(names_from = type), by = c("taxon", "station", "date")) %>%
-  select(taxon, station, datetime = datetime.x, date, hour = hour.x, measurement, baseline, calibration) %>%
+    pivot_wider(names_from = type), by = c("taxon", "station", "datetime")) %>%
+  select(taxon, station, datetime, measurement, baseline, calibration) %>%
+  # Remove timesteps with missing data in observations
+  filter(!is.na(measurement) & !is.na(baseline) & !is.na(calibration)) %>%
   pivot_longer(measurement:calibration, names_to = "type", values_to = "value") %>%
-  select(taxon, station, type, value, datetime, date, hour) %>%
-  filter(taxon == species_sel,
-         station != "Davos")
+  select(taxon, station, type, value, datetime) %>%
+  filter(
+    taxon == species_sel,
+    station != "Davos"
+  ) %>%
+  mutate(type = factor(type, ordered = TRUE, levels = c("measurement", "baseline", "calibration")))
 
 data_above10 <- data_combined %>%
   pivot_wider(names_from = type) %>%
   filter(measurement > 10, baseline > 10, calibration > 10) %>%
-  pivot_longer(measurement:calibration, names_to = "type", values_to = "value")
+  pivot_longer(measurement:calibration, names_to = "type", values_to = "value") %>%
+  mutate(type = factor(type, ordered = TRUE, levels = c("measurement", "baseline", "calibration")))
 
 
 data_log10 <- data_above10 %>%
@@ -131,7 +146,6 @@ data_altman <- data_above10 %>%
 data_corr <- data_log10 %>%
   pivot_wider(names_from = type) %>%
   select(datetime, measurement, baseline, calibration)
-
 
 data_impact_categories <- data_combined %>%
   pivot_wider(names_from = type) %>%
@@ -208,35 +222,197 @@ data_impact_categories <- data_combined %>%
     ~ factor(., levels = c("nothing", "weak", "medium", "strong", "verystrong"))
   )
 
+data_impact_categories_above10 <- data_impact_categories %>%
+  filter(measurement > 10)
 
+
+#' 
+#' ## Residual Analysis
+#' 
+#' First we compare the three data sets with the traditional ANOVA approach. Statistical inference (p-values, confidence intervals, . . . ) 
+#' is only valid if the model assumptions are fulfilled. So far, this means (many paragraphs are quoted from Lukas Meier ETH - Script Applied Statistics ANOVA Course):
+#' 
+#' - are the errors independent?
+#' - are the errors normally distributed?
+#' - is the error variance constant?
+#' - do the errors have mean zero?
+#' 
+#' The first assumption is most crucial (but also most difficult to check). If the independence assumption is
+#' violated, statistical inference can be very inaccurate. In the ANOVA setting, the last assumption is typically
+#' not as important compared to a regression setting, as we are typically fitting “large” models.
+#' 
+## ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+op <- options(contrasts = c("contr.sum", "contr.poly"))
+fit_anova <- aov(as.formula(paste("value ~ type")), data = data_above10)
+fit_anova_log <- aov(as.formula(paste("value ~ type")), data = data_log10)
+
+
+#' 
+#' ### Are the errors independent?
+#' 
+#' In a QQ-plot we plot the empirical quantiles (“what we see in the data”) vs. the theoretical quantiles (“what
+#' we expect from the model”). The plot should show a more or less straight line if the distributional assumption
+#' is correct. By default, a standard normal distribution is the theoretical “reference distribution”.
+#' 
+#' They are definitely not and we have to do some adjustments. So for the following plot we logarithmic the data to deal with the right-skewedness. 
+#' The best results were achieved by first logarithmic the data and then taking the square root.
+#' 
+## ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+gg_res1 <- tibble(residuals = residuals(fit_anova_log, type = "pearson")) %>%
+  ggplot(aes(sample = residuals)) +
+  stat_qq(col = "#222225", alpha = 0.1) +
+  stat_qq_line(col = "#cc2d2d")
+
+gg_res2 <- tibble(residuals = residuals(fit_anova, type = "pearson")) %>%
+  ggplot(aes(sample = residuals), col = col_hex[3]) +
+  stat_qq(col = "#222225", alpha = 0.1) +
+  stat_qq_line(col = "#cc2d2d")
+
+ggarrange(gg_res1, gg_res2, nrow = 1) %>%
+  annotate_figure(top = "QQ-Plot for the ANOVA Residuals With (left) and Without Logarithmizing")
+
+#' ### Do the errors have mean zero? & Is the error variance constant?
+#' The Tukey-Anscombe plot plots the residuals vs. the fitted values. 
+#' It allows us to check whether the residuals have constant variance and whether the residuals have mean zero 
+#' (i.e. they don’t show any deterministic pattern).
+#' We don't plot the smoothing line as loess (and other) algorithms have issues when the same value is repeated a large number of times (jitter did not really help).
+#' 
+## ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+gg_tukey1 <- tibble(resid = residuals(fit_anova_log, type = "pearson"), fitted = fit_anova_log$fitted.values) %>%
+  ggplot(aes(x = fitted, y = resid)) +
+  geom_point(col = "#222225", alpha = 0.5, position = position_jitter(width = 5, height = 0)) +
+  # geom_smooth(method = "loess", alpha = 0.2, col = "#3081b8", fill = "#74cbee") +
+  geom_abline(slope = 0, intercept = 0, col = "#cc2d2d")
+gg_tukey2 <-
+  tibble(resid = residuals(fit_anova, type = "pearson"), fitted = fit_anova$fitted.values) %>%
+  ggplot(aes(x = fitted, y = resid)) +
+  geom_point(col = "#222225", alpha = 0.5, position = position_jitter(width = 5, height = 0)) +
+  # geom_smooth(method = "loess", alpha = 0.2, col = "#3081b8", fill = "#74cbee") +
+  geom_abline(slope = 0, intercept = 0, col = "#cc2d2d")
+
+ggarrange(gg_tukey1, gg_tukey2) %>%
+  annotate_figure(top = "Tukey Anscombe - Plot for the ANOVA Residuals With (left) and Without Logarithmizing")
+
+
+#' 
+#' ### Are the errors normally distributed?
+#' 
+#' If the data has some serial structure (i.e., if observations were recorded in a certain time order), we typically
+#' want to check whether residuals close in time are more similar than residuals far apart, as this would be a
+#' violation of the independence assumption. We can do so by using a so-called index plot where we plot the
+#' residuals against time. For positively dependent residuals we would see time periods where most residuals
+#' have the same sign, while for negatively dependent residuals, the residuals would “jump” too often from
+#' positive to negative compared to independent residuals.
+#' 
+## ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+resid <- residuals(fit_anova_log, type = "pearson")
+resid_df <- tibble(resid = resid, id = as.numeric(names(resid)))
+
+gg_timeline_log <- tibble(id = 1:nrow(data_log10), time = data_log10$datetime) %>%
+  left_join(resid_df, by = "id") %>%
+  ggplot(aes(x = time, y = resid)) +
+  geom_point(alpha = 0.3, col = "#222225") +
+  geom_line(alpha = 0.3, col = "#222225")
+
+resid <- residuals(fit_anova, type = "pearson")
+resid_df <- tibble(resid = resid, id = as.numeric(names(resid)))
+
+gg_timeline <- tibble(id = 1:nrow(data_above10), time = data_above10$datetime) %>%
+  left_join(resid_df, by = "id") %>%
+  ggplot(aes(x = time, y = resid)) +
+  geom_point(alpha = 0.3, col = "#222225") +
+  geom_line(alpha = 0.3, col = "#222225")
+
+start_date <- case_when(
+  species_sel == "Betula" ~ as.POSIXct("2020-03-01"),
+  species_sel == "Poaceae" ~ as.POSIXct("2019-03-01"),
+  TRUE ~ as.POSIXct("2020-01-01")
+)
+end_date <- case_when(
+  species_sel == "Betula" ~ as.POSIXct("2020-05-31"),
+  species_sel == "Poaceae" ~ as.POSIXct("2019-10-31"),
+  TRUE ~ as.POSIXct("2020-03-31")
+)
+
+gg_timeline_log1 <- gg_timeline_log + coord_cartesian(x = c(start_date, end_date))
+gg_timeline_log2 <- gg_timeline_log + coord_cartesian(x = c(start_date + years(1), end_date + years(1)))
+gg_timeline1 <- gg_timeline + coord_cartesian(x = c(start_date, end_date))
+gg_timeline2 <- gg_timeline + coord_cartesian(x = c(start_date + years(1), end_date + years(1)))
+
+ggarrange(gg_timeline_log1, gg_timeline1, gg_timeline_log2, gg_timeline2, nrow = 2, ncol = 2) %>%
+  annotate_figure(top = "Index-Plot for the ANOVA Residuals With (left) and Without Logarithmizing")
+
+
+#' 
+#' Summary: Redidual Analysis shows that the assumptions of "normal" statiscal methods are validated even for log(daily values).
+#' It is therefore suggested to continue the analysis with robust and simple metrics.
 #' 
 #' ## Visual Assessment
 #' 
 #' ### Basic Plots
 #' 
 #' General overview of the daily concentration values as represented in the three timeseries.
+#' Each plot shows one species in one year. The seperate lines represent individual measurement stations.
+#' 
+## ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+startdate <- case_when(
+  species_sel == "Betula" ~ ymd_hms("2021-03-01 00:00:00"),
+  species_sel == "Poaceae" ~ ymd_hms("2020-03-01 00:00:00"),
+  TRUE ~ ymd_hms("2021-01-01 00:00:00")
+)
+enddate <- case_when(
+  species_sel == "Betula" ~ ymd_hms("2021-05-31 00:00:00"),
+  species_sel == "Poaceae" ~ ymd_hms("2020-09-30 00:00:00"),
+  TRUE ~ ymd_hms("2021-03-31 00:00:00")
+)
+
+data_otheryear <- data_combined %>%
+  filter(between(datetime, startdate - years(1), enddate - years(1))) %>%
+  mutate(
+    datetime = datetime + years(1),
+    station = paste0("other", station)
+  )
+
+(gg_timeseries <- data_combined %>%
+  filter(
+    taxon == species_sel,
+    between(datetime, startdate, enddate)
+  ) %>%
+  bind_rows(data_otheryear) %>%
+  ggplot() +
+  geom_line(aes(x = as.Date(datetime), y = log10(value + 1), col = type, fill = station), alpha = 0.25) +
+  facet_wrap(~type, nrow = 3) +
+  theme(legend.position = "none") +
+  scale_color_manual("", values = col_hex) +
+  scale_x_date(date_labels = "%d. %b") +
+  xlab("") +
+  ylab(paste0("Daily Mean Log. Concentrations [Pollen/m³]")) +
+  ggtitle(paste0("Timeseries of Daily ", species_sel, " Concentrations")))
+
+#' 
 #' First as a boxplot and second as a histogram. 
 #' 
-## ----echo=FALSE--------------------------------------------------------------------------------------------------------------------------------------------
-(gg1 <- data_log10 %>%
+## ----echo=FALSE----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+(gg_boxplot <- data_above10 %>%
   ggplot() +
-  geom_boxplot(aes(y = value, fill = type)) +
+  geom_boxplot(aes(y = value, fill = type), alpha = 0.9) +
   theme(
     legend.position = "bottom",
     axis.ticks.x = element_blank(),
     axis.text.x = element_blank()
   ) +
-  labs(y = "Log Mean Conc. [Pollen/m³]", x = "") +
-  scale_fill_manual(values = col_hex)) +
-  ggtitle(paste0("Boxplot of Daily ", species_sel, " Concentrations"))
+  labs(y = paste0("Daily Mean Concentrations [Pollen/m³]", x = "")) +
+  coord_cartesian(y = c(0, 1000)) +
+  scale_fill_manual("", values = col_hex) +
+  ggtitle(paste0("Boxplot of Daily ", species_sel, " Concentrations")))
 
 #' 
-## ----echo=FALSE--------------------------------------------------------------------------------------------------------------------------------------------
-sd_hirst <- data_combined %>%
+## ----echo=FALSE----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+sd_hirst <- data_above10 %>%
   group_by(type) %>%
-  summarise(sd = sd(value, na.rm = TRUE))
+  summarise(sd = sd(value))
 
-(gg2 <- data_log10 %>%
+(gg_hist <- data_log10 %>%
   ggplot() +
   geom_histogram(aes(
     y = value,
@@ -281,7 +457,7 @@ sd_hirst <- data_combined %>%
 #' 
 #' A good summary of the methods and their shortcomings can be found here: https://www.statisticssolutions.com/correlation-Pearson-Kendall-spearman/
 #' 
-## ----include=FALSE-----------------------------------------------------------------------------------------------------------------------------------------
+## ----include=FALSE-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 methods <- c("pearson", "spearman", "kendall")
 
@@ -299,55 +475,59 @@ corr_matrix <- map(methods, ~ corr.test(
 ))
 
 #' 
-## ----include=FALSE-----------------------------------------------------------------------------------------------------------------------------------------
+## ----include=FALSE-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 ci <- map(corr_matrix, ~ .x %>%
   pluck(10)) %>%
   bind_rows() %>%
   round(2) %>%
   mutate(
-    method = rep(methods, each = 3),
-    metric = rep(c("R-", "rho-", "tau-"), each = 3),
-    label = tools::toTitleCase(paste0(metric, method, ": ", lower, " - ", upper)),
+    method = tools::toTitleCase(rep(methods, each = 3)),
+    metric = rep(c("R", "Rho", "Tau"), each = 3),
+    label = paste0(method, "~", metric, ": ", lower, " - ", upper),
     comparison = rep(c("mb", "mc", "bc"), times = 3),
-    x = rep(c(0.4, 0.4, 0.41), each = 3),
-    y = rep(c(0.01, 0.03, 0.05), each = 3)
+    x = rep(c(2.5, 2.55, 2.5), each = 3),
+    y = rep(c(1, 1.15, 1.3), each = 3)
   )
 
 
 #' 
-## ----include=FALSE-----------------------------------------------------------------------------------------------------------------------------------------
+## ----include=FALSE-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 gg_corr1 <- data_corr %>%
-  ggplot(aes(x = log10(measurement), y = log10(baseline))) +
+  ggplot(aes(x = measurement, y = baseline)) +
   geom_point(alpha = 0.3, col = "#222225") +
-  xlim(0, 0.5) +
-  ylim(0, 0.5) +
+  xlim(1, 3) +
+  ylim(1, 3.5) +
   geom_smooth(data = data_corr, alpha = 0.2, col = "#3081b8", fill = "#74cbee") +
   geom_abline(slope = 1, intercept = 0, col = "#cc2d2d") +
-  geom_label(data = ci %>% filter(comparison == "mb"), aes(label = label, x = x, y = y), parse = TRUE) 
+  geom_label(data = ci %>% filter(comparison == "mb"), aes(label = label, x = x, y = y), parse = TRUE) +
+  xlab("log10(measurement)") +
+  ylab("log10(baseline)")
 
 #' 
-## ----include=FALSE-----------------------------------------------------------------------------------------------------------------------------------------
+## ----include=FALSE-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 gg_corr2 <- data_corr %>%
-  ggplot(aes(x = log10(measurement), y = log10(calibration))) +
+  ggplot(aes(x = measurement, y = calibration)) +
   geom_point(alpha = 0.3, col = "#222225") +
-  xlim(0, 0.5) +
-  ylim(0, 0.5) +
+  xlim(1, 3) +
+  ylim(1, 3.5) +
   geom_smooth(data = data_corr, alpha = 0.2, col = "#3081b8", fill = "#74cbee") +
   geom_abline(slope = 1, intercept = 0, col = "#cc2d2d") +
-  geom_label(data = ci %>% filter(comparison == "mc"), aes(label = label, x = x, y = y), parse = TRUE)
+  geom_label(data = ci %>% filter(comparison == "mc"), aes(label = label, x = x, y = y), parse = TRUE) +
+  xlab("log10(measurement)") +
+  ylab("log10(calibration)")
 
 #' 
 #' 
-## ----echo=FALSE, fig.height = 8, fig.width = 13, fig.dpi=300, out.width="100%"-----------------------------------------------------------------------------
+## ----echo=FALSE, fig.height = 8, fig.width = 13, fig.dpi=300, out.width="100%"-------------------------------------------------------------------------------------------------------------------
 (gg_corr <- ggarrange(gg_corr1, gg_corr2, ncol = 2) %>%
   annotate_figure(
-    top = paste0("Pairwise Correlation Between Model and Measurements for ", species_sel, " Pollen"),
-    bottom = text_grob("Pairwise correlation between Models; blue line shows the Loess smoother; 
-    the red line shows a theroratical perfect correlation of 1. In the text box one can see the 95% 
-    confidence intervals of the R-values (adjusted for multiple comparison) as obtained by Pearson and two robust methods.",
-      face = "italic", size = 10
-    )
-  ))
+    top = text_grob(paste0("Pairwise Correlation Between Model and Measurements for ", species_sel, " Pollen"), size = 14),
+    # bottom = text_grob("Pairwise correlation between Models; blue line shows the Loess smoother;
+    # the red line shows a theoretical perfect correlation of 1. In the text box one can see the 95%
+    # confidence intervals of the R-values (adjusted for multiple comparison) as obtained by Pearson and two robust methods.",
+    # face = "italic", size = 10)
+  )
+)
 
 #' 
 #' ## Altman Bland Plots
@@ -355,7 +535,7 @@ gg_corr2 <- data_corr %>%
 #' The well established AB-method for clinical trials can be used here as well to compare the means and differences between datasets. 
 #' If the points lie within the two SD-line for the differences the datasets can be assumed to be strongly associated with each other. 
 #' 
-## ----include=FALSE-----------------------------------------------------------------------------------------------------------------------------------------
+## ----include=FALSE-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 sd_diff <- data_altman %>%
   select(starts_with("diff")) %>%
   summarise_all(~ sd(.)) %>%
@@ -365,51 +545,52 @@ sd_diff <- data_altman %>%
 gg_ab1 <- data_altman %>%
   ggplot(aes(x = mean_baseline, y = diff_baseline)) +
   geom_point(alpha = 0.2, col = "#222225") +
-  xlim(0, 1000) +
+  xlim(0, 500) +
   ylim(-sd_diff[2] * 3, sd_diff[2] * 3) +
   geom_abline(
     slope = 0, intercept = 0, alpha = 0.8, col = "#cc2d2d"
   ) +
   geom_abline(
     slope = 0, col = "#cc2d2d",
-    intercept = sd_diff[1] * 2, alpha = 0.8, linetype = 3
+    intercept = sd_diff[1] * 1.96, alpha = 0.8, linetype = 3
   ) +
   geom_abline(
     slope = 0, col = "#cc2d2d",
-    intercept = sd_diff[1] * (-2), alpha = 0.8, linetype = 3
+    intercept = sd_diff[1] * (-1.96), alpha = 0.8, linetype = 3
   ) +
   geom_smooth(alpha = 0.3, col = "#3081b8", fill = "#74cbee") +
   labs(y = "Difference(Baseline - Measurement)", x = "Mean(Baseline, Measurement)")
 
 #' 
-## ----include=FALSE-----------------------------------------------------------------------------------------------------------------------------------------
-
+## ----include=FALSE-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 gg_ab2 <- data_altman %>%
   ggplot(aes(x = mean_calibration, y = diff_calibration)) +
   geom_point(alpha = 0.2, col = "#222225") +
-  xlim(0, 1000) +
+  xlim(0, 500) +
   ylim(-sd_diff[2] * 3, sd_diff[2] * 3) +
   geom_abline(
     slope = 0, intercept = 0, alpha = 0.8, col = "#cc2d2d"
   ) +
   geom_abline(
     slope = 0, col = "#cc2d2d",
-    intercept = sd_diff[2] * 2, alpha = 0.8, linetype = 3
+    intercept = sd_diff[2] * 1.96, alpha = 0.8, linetype = 3
   ) +
   geom_abline(
     slope = 0, col = "#cc2d2d",
-    intercept = sd_diff[2] * (-2), alpha = 0.8, linetype = 3
+    intercept = sd_diff[2] * (-1.96), alpha = 0.8, linetype = 3
   ) +
   geom_smooth(alpha = 0.3, col = "#3081b8", fill = "#74cbee") +
   labs(y = "Difference(Calibration - Measurement)", x = "Mean(Calibration, Measurement)")
 
 #' 
-## ----echo=FALSE, fig.height = 8, fig.width = 13, fig.dpi=300, out.width="100%"-----------------------------------------------------------------------------
+## ----echo=FALSE, fig.height = 8, fig.width = 13, fig.dpi=300, out.width="100%"-------------------------------------------------------------------------------------------------------------------
 (gg_ab <- ggarrange(gg_ab1, gg_ab2, ncol = 2) %>%
-  annotate_figure(top = paste0("Altman-Bland Plots for ", species_sel), bottom = text_grob("Pairwise comparison of Models; blue line shows the Loess smother; the red line shows a theroratical perfect
-  agreement between Model and Measurements of zero. The dashed red line shows the 2 * sd of the differences, where we expect the points to lie within.",
-    face = "italic", size = 12
-  )))
+  annotate_figure(
+    top = text_grob(paste0("Altman-Bland Plots for ", species_sel), size = 14),
+    # bottom = text_grob("Pairwise comparison of Models; blue line shows the Loess smother; the red line shows a theoretical perfect
+    # agreement between Model and Measurements of zero. The dashed red line shows the 2 * sd of the differences, where we expect the points to lie within.",
+    #   face = "italic", size = 12)
+  ))
 
 
 #' 
@@ -417,116 +598,127 @@ gg_ab2 <- data_altman %>%
 #' 
 #' These plots allow to observe the error for different concentration categories.
 #' 
-## ----include=FALSE-----------------------------------------------------------------------------------------------------------------------------------------
+## ----include=FALSE-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 categs <- c("weak", "medium", "strong", "verystrong")
 
 gg_conc_dens <- list()
 gg_conc_box <- list()
 
-labels_y <- list(0.1, 0.015, 0.004, 0.002)
+labels_y <- list(0.2, 0.02, 0.0075, 0.002)
 labels_y_hist <- list(15, 13, 10, 10, 7.5, 3)
-xlims <- list(50, 500, 1000, 2000)
+xlims <- case_when(
+  species_sel == "Corylus" ~ list(50, 500, 750, 1000),
+  species_sel == "Poaceae" ~ list(50, 200, 400, 750),
+  TRUE ~ list(50, 500, 1000, 2000)
+)
+
 names(labels_y) <- categs
 names(xlims) <- categs
 
 for (j in categs) {
-    obs <- data_impact_categories %>%
-      filter(categories_measurement == j) %>%
-      summarise(n()) %>%
-      pull()
-    obs <- paste("# of Observations:", obs)
+  obs <- data_impact_categories %>%
+    filter(categories_measurement == j) %>%
+    summarise(n()) %>%
+    pull()
+  obs <- paste("# of Observations:", obs)
 
-    gg_conc_dens[[j]] <- data_impact_categories %>%
-      filter(categories_measurement == j) %>%
-      pivot_longer(measurement:calibration, names_to = "type", values_to = "Concentration") %>%
-      ggplot() +
-      # The area under that whole curve should be 1.
-      # To get an estimate of the probability of certain values,
-      # you'd have to integrate over an interval on your 'y' axis,
-      # and that value should never be greater than 1.
-      geom_density(aes(x = Concentration, col = type, fill = type), alpha = 0.15) +
-      geom_label(label = obs, aes(x = max(Concentration) * 0.7), y = labels_y[[j]]) +
-      scale_colour_manual("", values = col_hex) +
-      scale_fill_manual(values = col_hex) +
-      coord_cartesian(xlim = c(0, xlims[[j]])) +
-      guides(fill = "none") +
-      ggtitle(j)
+  gg_conc_dens[[j]] <- data_impact_categories %>%
+    filter(categories_measurement == j) %>%
+    pivot_longer(measurement:calibration, names_to = "type", values_to = "Concentration") %>%
+    ggplot() +
+    # The area under that whole curve should be 1.
+    # To get an estimate of the probability of certain values,
+    # you'd have to integrate over an interval on your 'y' axis,
+    # and that value should never be greater than 1.
+    geom_density(aes(x = Concentration, col = type, fill = type), alpha = 0.15) +
+    annotate("text", x = xlims[[j]] * 0.6, y = labels_y[[j]], label = obs) +
+    scale_colour_manual("", values = col_hex) +
+    scale_fill_manual(values = col_hex) +
+    coord_cartesian(xlim = c(0, xlims[[j]])) +
+    guides(fill = "none") +
+    ggtitle(j)
 
-   gg_conc_box[[j]] <- data_impact_categories %>%
-      filter(categories_measurement == j) %>%
-      pivot_longer(measurement:calibration, names_to = "type", values_to = "Concentration") %>%
-      ggplot() +
-      # The area under that whole curve should be 1.
-      # To get an estimate of the probability of certain values,
-      # you'd have to integrate over an interval on your 'y' axis,
-      # and that value should never be greater than 1.
-      geom_boxplot(aes(x = Concentration, col = type, fill = type), alpha = 0.15) +
-      scale_colour_manual("", values = col_hex) +
-      scale_fill_manual(values = col_hex) +
-      coord_cartesian(xlim = c(0, xlims[[j]])) +
-      guides(fill = "none") +
-      ggtitle(j)
-      
-  }
+  gg_conc_box[[j]] <- data_impact_categories %>%
+    filter(categories_measurement == j) %>%
+    pivot_longer(measurement:calibration, names_to = "type", values_to = "Concentration") %>%
+    ggplot() +
+    # The area under that whole curve should be 1.
+    # To get an estimate of the probability of certain values,
+    # you'd have to integrate over an interval on your 'y' axis,
+    # and that value should never be greater than 1.
+    geom_boxplot(aes(x = Concentration, col = type, fill = type), alpha = 0.15) +
+    scale_colour_manual("", values = col_hex) +
+    scale_fill_manual(values = col_hex) +
+    annotate("text", x = xlims[[j]] * 0.6, y = 0.35, label = obs) +
+    coord_cartesian(xlim = c(0, xlims[[j]])) +
+    guides(fill = "none") +
+    xlab("Concentration [Pollen/m³]") +
+    ylab("") +
+    ggtitle(j) +
+    theme(axis.text.y = element_blank(), axis.text.y.left = element_blank())
+}
 
 #' 
-## ----echo=FALSE, fig.height = 8, fig.width = 13, fig.dpi=300, out.width="100%"-----------------------------------------------------------------------------
-
+## ----echo=FALSE, fig.height = 8, fig.width = 13, fig.dpi=300, out.width="100%"-------------------------------------------------------------------------------------------------------------------
 (gg_dens_conc <- ggarrange(plotlist = gg_conc_dens) %>%
   annotate_figure(
-    top = paste0("Comparison of Measurements and Model Predictions for ", species_sel,
-      " for All Stations and Different Concentration Groups."),
-    bottom = text_grob(paste0("We are looking at Density Kernel Estimators ",
+    top = paste0(
+      "Comparison of Measurements and Model Predictions for ", species_sel,
+      " for All Stations and Different Concentration Groups."
+    ),
+    bottom = text_grob(paste0(
+      "We are looking at Density Kernel Estimators ",
       "for all three timeseries to compare the measurements between them. ",
       "\n The area under each curve adds up to 1 and makes it possible ",
       "to vizualise the (dis-)similarities of measurements from the ",
       "three timeseries. \n It is basically a smoothed histogram. ",
-      "The buckets are based on the mean concentrations of measurements and model."),
-      face = "italic",
-      size = 10
-    )
-  ))
-
-
-#' 
-## ----echo=FALSE, fig.height = 8, fig.width = 13, fig.dpi=300, out.width="100%"-----------------------------------------------------------------------------
-(gg_dens_box <- ggarrange(plotlist = gg_conc_box, common.legend = TRUE, legend = "bottom") %>%
-  annotate_figure(
-    top = paste(
-      "Comparison of Measurements and Model Predictions for ", species_sel,
-      "for All Stations and Different Concentration Groups."
+      "The buckets are based on the mean concentrations of measurements and model."
     ),
-    bottom = text_grob(paste0("We are looking at Boxplots for different health impact groups to
-    investigate the differences between modeled and measured concentrations"),
-      face = "italic",
-      size = 10
+    face = "italic",
+    size = 10
     )
+  ))
+
+
+#' 
+## ----echo=FALSE, fig.height = 8, fig.width = 13, fig.dpi=300, out.width="100%"-------------------------------------------------------------------------------------------------------------------
+(gg_boxplot_conc <- ggarrange(plotlist = gg_conc_box, common.legend = TRUE, legend = "right") %>%
+  annotate_figure(
+    top = text_grob(paste(
+      "Model vs. Measurement Boxplot Comparison for Different Health Impact Groups"
+    ), size = 14),
+    # bottom = text_grob(paste0("We are looking at Boxplots for different health impact groups to
+    # investigate the differences between modeled and measured concentrations"),
+    #   face = "italic",
+    #   size = 10)
   ))
 
 #' 
 #' 
-## ----echo=FALSE--------------------------------------------------------------------------------------------------------------------------------------------
+## ----echo=FALSE----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 data_impact_categories %>%
-  mutate(diff_baseline = baseline - measurement,
-         diff_calibration = calibration - measurement) %>%
-         pivot_longer(diff_baseline:diff_calibration) %>%
-         mutate(name = str_remove(name, "diff_")) %>%
-         ggplot() +
-         geom_boxplot(aes(x = categories_measurement, y = value, fill = name)) +
-         scale_fill_manual("", values = col_hex[2:3]) +
-        #  scale_y_continuous(trans='log10') + 
-         coord_cartesian(ylim = c(-500, 1000)) +
-         ggtitle(paste("Differences Between Modelled and Measured", species_sel, "Concentrations")) +
-         xlab("") +
-         ylab("Concentration [1/m³]") +
-         theme(legend.position = "bottom")
+  mutate(
+    diff_baseline = baseline - measurement,
+    diff_calibration = calibration - measurement
+  ) %>%
+  pivot_longer(diff_baseline:diff_calibration) %>%
+  mutate(name = str_remove(name, "diff_")) %>%
+  ggplot() +
+  geom_boxplot(aes(x = categories_measurement, y = value, fill = name)) +
+  scale_fill_manual("", values = col_hex[2:3]) +
+  #  scale_y_continuous(trans='log10') +
+  coord_cartesian(ylim = c(-500, 1000)) +
+  ggtitle(paste("Differences Between Modelled and Measured", species_sel, "Concentrations")) +
+  xlab("") +
+  ylab("Concentration [1/m³]") +
+  theme(legend.position = "bottom")
 
 #' 
 #' ## Statistical Assessment
 #' 
 #' First, various metrics are compared where the pollen concentrations are considered a continuous numerical variable.
 #' 
-## ----echo=FALSE--------------------------------------------------------------------------------------------------------------------------------------------
+## ----echo=FALSE----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 metrics_baseline <- data_above10 %>%
   pivot_wider(names_from = type) %>%
   filter(!is.na(baseline)) %>%
@@ -539,7 +731,7 @@ metrics_baseline <- data_above10 %>%
     SD = sd(error),
     MAE = mean(abs(error)),
     RMSE = sqrt(mean((error)^2)),
-    MSLE = mean((log(1 + baseline) - log(1 + measurement))^2, na.rm = TRUE),
+    MSLE = mean((log10(1 + baseline) - log10(1 + measurement))^2, na.rm = TRUE),
     RMSLE = sqrt(MSLE)
   ) %>%
   mutate(type = "baseline")
@@ -556,7 +748,7 @@ metrics_calibration <- data_above10 %>%
     SD = sd(error),
     MAE = mean(abs(error)),
     RMSE = sqrt(mean((error)^2)),
-    MSLE = mean((log(1 + calibration) - log(1 + measurement))^2, na.rm = TRUE),
+    MSLE = mean((log10(1 + calibration) - log10(1 + measurement))^2, na.rm = TRUE),
     RMSLE = sqrt(MSLE)
   ) %>%
   mutate(type = "calibration")
@@ -576,10 +768,10 @@ metrics_baseline %>%
 #' The Kappa metric is explained here and was chosen as the most meaningful metric for this analysis:
 #' https://towardsdatascience.com/multi-class-metrics-made-simple-the-kappa-score-aka-cohens-kappa-coefficient-bdea137af09c
 #' 
-## ----echo=FALSE--------------------------------------------------------------------------------------------------------------------------------------------
+## ----echo=FALSE----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 matrix_baseline <- confusionMatrix(
-  data_impact_categories$categories_baseline,
-  data_impact_categories$categories_measurement
+  data_impact_categories_above10$categories_baseline,
+  data_impact_categories_above10$categories_measurement
 )
 kappa_baseline <- matrix_baseline$overall[1:2] %>%
   tibble() %>%
@@ -589,8 +781,8 @@ kappa_baseline <- matrix_baseline$overall[1:2] %>%
   )
 
 matrix_calibration <- confusionMatrix(
-  data_impact_categories$categories_calibration,
-  data_impact_categories$categories_measurement
+  data_impact_categories_above10$categories_calibration,
+  data_impact_categories_above10$categories_measurement
 )
 kappa_calibration <- matrix_calibration$overall[1:2] %>%
   tibble() %>%
@@ -611,23 +803,22 @@ kappa_baseline %>%
 
 #' 
 #' To takes into account that the health impact levels are ordered. 
-#' We can treat them as numerical values from 1:weak - 4: very strong.
+#' We can treat them as numerical values from 0:nothing - 4: very strong.
 #' 
 #' 
-## ----echo=FALSE--------------------------------------------------------------------------------------------------------------------------------------------
-
+## ----echo=FALSE----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 my_header <- c(seciesl_sel = 2)
 names(my_header) <- species_sel
 
-data_impact_categories %>%
+data_impact_categories_above10 %>%
   select(taxon, station, datetime, categories_measurement, categories_baseline, categories_calibration) %>%
-  mutate(across(categories_measurement:categories_calibration, ~as.numeric(.x)),
-  error_baseline = categories_baseline - categories_measurement,
-  error_calibration = categories_calibration - categories_measurement) %>%
-  filter(if_any(categories_measurement:categories_calibration, ~ . > 1)) %>%
+  mutate(across(categories_measurement:categories_calibration, ~ as.numeric(.x)),
+    error_baseline = categories_baseline - categories_measurement,
+    error_calibration = categories_calibration - categories_measurement
+  ) %>%
   summarize(
-  MAE_baseline = mean(abs(error_baseline)),
-  MAE_calibration = mean(abs(error_calibration))
+    MAE_baseline = mean(abs(error_baseline)),
+    MAE_calibration = mean(abs(error_calibration))
   ) %>%
   kable() %>%
   kable_styling("striped", full_width = FALSE) %>%
@@ -656,34 +847,44 @@ data_impact_categories %>%
 #' - Recall = A/(A+C)
 #' - F1 = (1+beta^2)*precision*recall/((beta^2 * precision)+recall)
 #' 
-## ----echo=FALSE--------------------------------------------------------------------------------------------------------------------------------------------
-
+## ----echo=FALSE----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 my_header <- c(seciesl_sel = 13)
 names(my_header) <- species_sel
 
 matrix_baseline$byClass %>%
   as_tibble() %>%
   mutate(
-    class = rownames(matrix_baseline$byClass),
+    class = factor(rownames(matrix_baseline$byClass),
+      ordered = TRUE,
+      levels = c(
+        "Class: nothing",
+        "Class: weak",
+        "Class: medium",
+        "Class: strong",
+        "Class: verystrong"
+      )
+    ),
     type = "baseline"
-  ) %>%
-  filter(
-    class != "Class: nothing",
-    class != "Class: weak"
   ) %>%
   bind_rows(
     matrix_calibration$byClass %>%
       as_tibble() %>%
       mutate(
-        class = rownames(matrix_calibration$byClass),
+        class = factor(rownames(matrix_baseline$byClass),
+          ordered = TRUE,
+          levels = c(
+            "Class: nothing",
+            "Class: weak",
+            "Class: medium",
+            "Class: strong",
+            "Class: verystrong"
+          )
+        ),
         type = "calibration"
-      )
-      %>% filter(
-        class != "Class: nothing",
-        class != "Class: weak"
       )
   ) %>%
   mutate(across(c(-class, -type), ~ round(., digits = 3))) %>%
+  arrange(class) %>%
   kable(escape = FALSE) %>%
   kable_styling("striped", full_width = FALSE) %>%
   add_header_above(my_header)
@@ -697,14 +898,13 @@ matrix_baseline$byClass %>%
 #' The null hypothesis H0: p = 1/2 is significantly rejected at 5% level of significance for many pairwise comparisons.
 #' Whenever the p-Value is < than 5% = the confidence interval contains 0.5 -> the effect from the factor trap is not statistically meaningful.
 #' The Estimator can also be interpreted as a proxy for the relative difference in median between Model and Measurements.
-#' If the Estimator is > 0.5 then the second trap tends to have larger measurements.
+#' If the Estimator is > 0.5 then the model tends to have larger measurements.
 #' 
-## ----echo=FALSE--------------------------------------------------------------------------------------------------------------------------------------------
-
-npar_contr <- 
+## ----echo=FALSE----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+npar_contr <-
   nparcomp(
     value ~ type,
-    data = data_log10,
+    data = data_above10,
     # slice(1:3870),
     conf.level = 0.95,
     alternative = "two.sided",
@@ -715,7 +915,7 @@ npar_contr <-
 title <- paste(
   "Robust Contrasts and Confidence Intervals for", species_sel, "Measurements"
 )
-myheader <- c(title = 8)
+myheader <- c(title = 6)
 names(myheader) <- title
 
 npar_contr$Analysis %>%
@@ -728,4 +928,13 @@ npar_contr$Analysis %>%
   kable(escape = FALSE) %>%
   kable_styling("striped", full_width = FALSE) %>%
   add_header_above(myheader)
+
+#' 
+## ----paper---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+# Export plots for paper
+ggsave("vignettes/gg_timeseries.png", gg_timeseries, width = 9, height = 6, bg = "white", dpi = 300)
+ggsave("vignettes/gg_boxplot.png", gg_boxplot, width = 9, height = 7, bg = "white", dpi = 300)
+ggsave("vignettes/gg_corr.png", gg_corr, width = 10, height = 6, bg = "white", dpi = 300)
+ggsave("vignettes/gg_ab.png", gg_ab, width = 10, height = 6, bg = "white", dpi = 300)
+ggsave("vignettes/gg_boxplot_conc.png", gg_boxplot_conc, width = 9, height = 7, bg = "white", dpi = 300)
 
