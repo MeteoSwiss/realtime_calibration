@@ -38,6 +38,8 @@ library(kableExtra)
 library(purrr)
 library(ggplot2)
 library(ggpubr)
+library(gridExtra)
+library(ggtext)
 library(here)
 library(lubridate)
 library(caret)
@@ -386,8 +388,9 @@ data_otheryear <- data_combined %>%
   scale_color_manual("", values = col_hex) +
   scale_x_date(date_labels = "%d. %b") +
   xlab("") +
-  ylab(paste0("Daily Mean Log. Concentrations [Pollen/m³]")) +
-  ggtitle(paste0("Timeseries of Daily ", species_sel, " Concentrations")))
+  ylab(paste0("Daily Mean Log. Concentrations [Pollen / m³]")) +
+  ggtitle(paste0("Time Series of Daily ", "*", species_sel, "*", " Pollen Concentrations")) +
+  theme(plot.title = element_markdown()))
 ```
 
 First as a boxplot and second as a histogram. 
@@ -401,10 +404,11 @@ First as a boxplot and second as a histogram.
     axis.ticks.x = element_blank(),
     axis.text.x = element_blank()
   ) +
-  labs(y = paste0("Daily Mean Concentrations [Pollen/m³]", x = "")) +
+  labs(y = paste0("Daily Mean Concentrations [Pollen / m³]", x = "")) +
   coord_cartesian(y = c(0, 1000)) +
   scale_fill_manual("", values = col_hex) +
-  ggtitle(paste0("Boxplot of Daily ", species_sel, " Concentrations")))
+  ggtitle(paste0("Boxplot of Daily ", "*", species_sel, "*", " Pollen Concentrations")) +
+  theme(plot.title = ggtext::element_markdown()))
 ```
 
 ```{r echo=FALSE}
@@ -435,8 +439,9 @@ sd_hirst <- data_above10 %>%
   theme(legend.position = "bottom") +
   scale_fill_manual(values = col_hex) +
   coord_flip() +
-  labs(x = "Occurence of Pollen Concentrations", y = "Log Mean Conc. [Pollen/m³]")) +
-  ggtitle(paste0("Histogram of Daily ", species_sel, " Concentrations"))
+  labs(x = "Occurence of Pollen Concentrations", y = "Log Mean Conc. [Pollen / m³]") +
+  ggtitle(paste0("Histogram of Daily ", "*", species_sel, "*", " Pollen Concentrations")) +
+  theme(plot.title = ggtext::element_markdown()))
 
 ```
 
@@ -521,13 +526,20 @@ gg_corr2 <- data_corr %>%
 ```{r echo=FALSE, fig.height = 8, fig.width = 13, fig.dpi=300, out.width="100%"}
 (gg_corr <- ggarrange(gg_corr1, gg_corr2, ncol = 2) %>%
   annotate_figure(
-    top = text_grob(paste0("Pairwise Correlation Between Model and Measurements for ", species_sel, " Pollen"), size = 14),
+    # top = text_grob(paste0("Pairwise Correlation Between Model and Measurements for ", species_sel, " Pollen"), size = 14, face = "italic"),
+    top = arrangeGrob(
+      text_grob("Pairwise Correlation Between Model and Measurements for ", vjust = 1.2, hjust = 0.15, size = 14),
+      text_grob(species_sel, vjust = 1.2, hjust = -3, face = "italic", size = 14),
+      text_grob(" Pollen", vjust = 1.2, hjust = 1.85, size = 14),
+      nrow = 1, padding = unit(4, "line")
+    )
     # bottom = text_grob("Pairwise correlation between Models; blue line shows the Loess smoother;
     # the red line shows a theoretical perfect correlation of 1. In the text box one can see the 95%
     # confidence intervals of the R-values (adjusted for multiple comparison) as obtained by Pearson and two robust methods.",
     # face = "italic", size = 10)
   )
 )
+
 ```
 
 ## Altman Bland Plots
@@ -573,11 +585,11 @@ gg_ab2 <- data_altman %>%
   ) +
   geom_abline(
     slope = 0, col = "#cc2d2d",
-    intercept = sd_diff[2] * 1.96, alpha = 0.8, linetype = 3
+    intercept = sd_diff[2] * 1.96, alpha = 0.8, linetype = 3, size = 1
   ) +
   geom_abline(
     slope = 0, col = "#cc2d2d",
-    intercept = sd_diff[2] * (-1.96), alpha = 0.8, linetype = 3
+    intercept = sd_diff[2] * (-1.96), alpha = 0.8, linetype = 3, size = 1
   ) +
   geom_smooth(alpha = 0.3, col = "#3081b8", fill = "#74cbee") +
   labs(y = "Difference(Calibration - Measurement)", x = "Mean(Calibration, Measurement)")
@@ -586,7 +598,12 @@ gg_ab2 <- data_altman %>%
 ```{r echo=FALSE, fig.height = 8, fig.width = 13, fig.dpi=300, out.width="100%"}
 (gg_ab <- ggarrange(gg_ab1, gg_ab2, ncol = 2) %>%
   annotate_figure(
-    top = text_grob(paste0("Altman-Bland Plots for ", species_sel), size = 14),
+    top = gridExtra::arrangeGrob(
+      text_grob("Altman-Bland Plots for ", vjust = 1.2, hjust = -0.7, size = 14),
+      text_grob(species_sel, vjust = 1.2, hjust = -0.83, face = "italic", size = 14),
+      text_grob(" Pollen", vjust = 1.2, hjust = 3.7, size = 14),
+      nrow = 1, padding = unit(4, "line")
+    )
     # bottom = text_grob("Pairwise comparison of Models; blue line shows the Loess smother; the red line shows a theoretical perfect
     # agreement between Model and Measurements of zero. The dashed red line shows the 2 * sd of the differences, where we expect the points to lie within.",
     #   face = "italic", size = 12)
@@ -641,6 +658,7 @@ for (j in categs) {
   gg_conc_box[[j]] <- data_impact_categories %>%
     filter(categories_measurement == j) %>%
     pivot_longer(measurement:calibration, names_to = "type", values_to = "Concentration") %>%
+    mutate(type = factor(type, levels = c("calibration", "baseline", "measurement"))) %>%
     ggplot() +
     # The area under that whole curve should be 1.
     # To get an estimate of the probability of certain values,
@@ -652,10 +670,10 @@ for (j in categs) {
     annotate("text", x = xlims[[j]] * 0.6, y = 0.35, label = obs) +
     coord_cartesian(xlim = c(0, xlims[[j]])) +
     guides(fill = "none") +
-    xlab("Concentration [Pollen/m³]") +
+    xlab("Concentration [Pollen / m³]") +
     ylab("") +
     ggtitle(j) +
-    theme(axis.text.y = element_blank(), axis.text.y.left = element_blank())
+    theme(axis.text.y = element_blank(), axis.text.y.left = element_blank(), plot.margin = margin(1, 0, 0, 0, "cm"))
 }
 ```
 
@@ -664,7 +682,7 @@ for (j in categs) {
   annotate_figure(
     top = paste0(
       "Comparison of Measurements and Model Predictions for ", species_sel,
-      " for All Stations and Different Concentration Groups."
+      " Pollen for All Stations and Different Concentration Groups."
     ),
     bottom = text_grob(paste0(
       "We are looking at Density Kernel Estimators ",
@@ -682,16 +700,20 @@ for (j in categs) {
 ```
 
 ```{r echo=FALSE, fig.height = 8, fig.width = 13, fig.dpi=300, out.width="100%"}
-(gg_boxplot_conc <- ggarrange(plotlist = gg_conc_box, common.legend = TRUE, legend = "right") %>%
+(gg_boxplot_conc <- ggarrange(plotlist = gg_conc_box, common.legend = TRUE, legend = "right", vjust = 5) %>%
   annotate_figure(
-    top = text_grob(paste(
-      "Model vs. Measurement Boxplot Comparison for Different Health Impact Groups"
-    ), size = 14),
+    top = gridExtra::arrangeGrob(
+      text_grob("Model vs. Measurement Boxplot Comparison for Different Health Impact Groups for ", vjust =1.2, hjust = 0.18, size = 12),
+      text_grob(species_sel, vjust = 1.2, hjust = -6, face = "italic", size = 12),
+      text_grob(" Pollen", vjust = 1.2, hjust = -0.4, size = 12),
+      nrow = 1, padding = unit(4, "line")
+    )
     # bottom = text_grob(paste0("We are looking at Boxplots for different health impact groups to
     # investigate the differences between modeled and measured concentrations"),
     #   face = "italic",
     #   size = 10)
   ))
+
 ```
 
 
@@ -708,9 +730,9 @@ data_impact_categories %>%
   scale_fill_manual("", values = col_hex[2:3]) +
   #  scale_y_continuous(trans='log10') +
   coord_cartesian(ylim = c(-500, 1000)) +
-  ggtitle(paste("Differences Between Modelled and Measured", species_sel, "Concentrations")) +
+  ggtitle(paste("Differences Between Modelled and Measured", species_sel, " Pollen Concentrations")) +
   xlab("") +
-  ylab("Concentration [1/m³]") +
+  ylab("Concentration [Pollen / m³]") +
   theme(legend.position = "bottom")
 ```
 
@@ -913,7 +935,7 @@ npar_contr <-
   )
 
 title <- paste(
-  "Robust Contrasts and Confidence Intervals for", species_sel, "Measurements"
+  "Robust Contrasts and Confidence Intervals for", species_sel, " Pollen Measurements"
 )
 myheader <- c(title = 6)
 names(myheader) <- title
