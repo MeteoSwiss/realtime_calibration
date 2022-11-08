@@ -599,7 +599,7 @@ gg_ab2 <- data_altman %>%
 (gg_ab <- ggarrange(gg_ab1, gg_ab2, ncol = 2) %>%
   annotate_figure(
     top = gridExtra::arrangeGrob(
-      text_grob("Altman-Bland Plots for ", vjust = 1.2, hjust = -0.7, size = 14),
+      text_grob("Bland-Altman Plots for ", vjust = 1.2, hjust = -0.7, size = 14),
       text_grob(species_sel, vjust = 1.2, hjust = -0.83, face = "italic", size = 14),
       text_grob(" Pollen", vjust = 1.2, hjust = 3.7, size = 14),
       nrow = 1, padding = unit(4, "line")
