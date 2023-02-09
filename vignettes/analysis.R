@@ -10,11 +10,12 @@
 #'   word_document: default
 #' ---
 #' 
-## ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+## ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 # THE USER CAN SELECT A SPECIES HERE!
 # Alnus, Betula, Corylus or Poaceae (Alder, Birch, Hazel or Grasses)
 
 species_sel <- "Alnus"
+threshold <- 1
 
 #' 
 #' In this project we want to evaluate the new pollen forecast module that uses "realtime data"
@@ -27,7 +28,7 @@ species_sel <- "Alnus"
 #' For detailed information about the final implementation in COSMO-1E please refer to this 
 #' documentation page (ask meteoswiss for access): https://service.meteoswiss.ch/confluence/x/dYQYBQ
 #' 
-## ----include=FALSE-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+## ----include=FALSE----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 library(readr)
 library(dplyr)
 library(tidyr)
@@ -38,6 +39,8 @@ library(kableExtra)
 library(purrr)
 library(ggplot2)
 library(ggpubr)
+library(gridExtra)
+library(ggtext)
 library(here)
 library(lubridate)
 library(caret)
@@ -53,7 +56,7 @@ conflict_prefer("date", "lubridate")
 devtools::load_all()
 
 #' 
-## ----include=FALSE-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+## ----include=FALSE----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 # Main colors for the analysis
 theme_set(theme_minimal(base_size = 12))
 col_names <- c("measurement", "baseline", "calibration")
@@ -62,7 +65,7 @@ names(col_hex) <- col_names
 
 #' 
 #' 
-## ----include=FALSE-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+## ----include=FALSE----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 load(paste0(here(), "/data/other/species.RData"))
 load(paste0(here(), "/data/other/stations.RData"))
 load(paste0(here(), "/data/cosmo/data_cosmo.RData"))
@@ -87,7 +90,7 @@ load(paste0(here(), "/data/dwh/data_dwh.RData"))
 #' The analysis will be carried out for each species individually, but all for all stations and both years combined.
 #' 
 #' The observations are provided at 14 different stations, whereof one is excluded from the analysis:
-#' Davos is high up in the mountains and pollen measurements are almost always zero.
+#' Davos/Wolfgang is high up in the mountains and pollen measurements are almost always zero.
 #' 
 #' The following settings are crucial and should always be remembered when running the chunks below:
 #' 
@@ -107,7 +110,7 @@ load(paste0(here(), "/data/dwh/data_dwh.RData"))
 #' Whether low values <10 were removed are not will be denoted in all figure captions and 
 #' should allow the reader to get a full picture of the data.
 #' 
-## ----include=FALSE-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+## ----include=FALSE----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 data_combined <- data_dwh %>%
   pivot_wider(names_from = type) %>%
   inner_join(data_cosmo %>%
@@ -119,13 +122,13 @@ data_combined <- data_dwh %>%
   select(taxon, station, type, value, datetime) %>%
   filter(
     taxon == species_sel,
-    station != "Davos"
+    station != "Wolfgang"
   ) %>%
   mutate(type = factor(type, ordered = TRUE, levels = c("measurement", "baseline", "calibration")))
 
 data_above10 <- data_combined %>%
   pivot_wider(names_from = type) %>%
-  filter(measurement > 10, baseline > 10, calibration > 10) %>%
+  filter(measurement > threshold, baseline > threshold, calibration > threshold) %>%
   pivot_longer(measurement:calibration, names_to = "type", values_to = "value") %>%
   mutate(type = factor(type, ordered = TRUE, levels = c("measurement", "baseline", "calibration")))
 
@@ -223,7 +226,7 @@ data_impact_categories <- data_combined %>%
   )
 
 data_impact_categories_above10 <- data_impact_categories %>%
-  filter(measurement > 10)
+  filter(measurement > threshold)
 
 
 #' 
@@ -241,7 +244,7 @@ data_impact_categories_above10 <- data_impact_categories %>%
 #' violated, statistical inference can be very inaccurate. In the ANOVA setting, the last assumption is typically
 #' not as important compared to a regression setting, as we are typically fitting “large” models.
 #' 
-## ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+## ----echo=FALSE-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 op <- options(contrasts = c("contr.sum", "contr.poly"))
 fit_anova <- aov(as.formula(paste("value ~ type")), data = data_above10)
 fit_anova_log <- aov(as.formula(paste("value ~ type")), data = data_log10)
@@ -257,7 +260,7 @@ fit_anova_log <- aov(as.formula(paste("value ~ type")), data = data_log10)
 #' They are definitely not and we have to do some adjustments. So for the following plot we logarithmic the data to deal with the right-skewedness. 
 #' The best results were achieved by first logarithmic the data and then taking the square root.
 #' 
-## ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+## ----echo=FALSE-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 gg_res1 <- tibble(residuals = residuals(fit_anova_log, type = "pearson")) %>%
   ggplot(aes(sample = residuals)) +
   stat_qq(col = "#222225", alpha = 0.1) +
@@ -277,8 +280,11 @@ ggarrange(gg_res1, gg_res2, nrow = 1) %>%
 #' (i.e. they don’t show any deterministic pattern).
 #' We don't plot the smoothing line as loess (and other) algorithms have issues when the same value is repeated a large number of times (jitter did not really help).
 #' 
-## ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-gg_tukey1 <- tibble(resid = residuals(fit_anova_log, type = "pearson"), fitted = fit_anova_log$fitted.values) %>%
+## ----echo=FALSE-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+gg_tukey1 <- tibble(
+  resid = residuals(fit_anova_log, type = "pearson"),
+  fitted = fit_anova_log$fitted.values
+) %>%
   ggplot(aes(x = fitted, y = resid)) +
   geom_point(col = "#222225", alpha = 0.5, position = position_jitter(width = 5, height = 0)) +
   # geom_smooth(method = "loess", alpha = 0.2, col = "#3081b8", fill = "#74cbee") +
@@ -304,11 +310,11 @@ ggarrange(gg_tukey1, gg_tukey2) %>%
 #' have the same sign, while for negatively dependent residuals, the residuals would “jump” too often from
 #' positive to negative compared to independent residuals.
 #' 
-## ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+## ----echo=FALSE-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 resid <- residuals(fit_anova_log, type = "pearson")
 resid_df <- tibble(resid = resid, id = as.numeric(names(resid)))
 
-gg_timeline_log <- tibble(id = 1:nrow(data_log10), time = data_log10$datetime) %>%
+gg_timeline_log <- tibble(id = seq_len(nrow(data_log10)), time = data_log10$datetime) %>%
   left_join(resid_df, by = "id") %>%
   ggplot(aes(x = time, y = resid)) +
   geom_point(alpha = 0.3, col = "#222225") +
@@ -317,7 +323,7 @@ gg_timeline_log <- tibble(id = 1:nrow(data_log10), time = data_log10$datetime) %
 resid <- residuals(fit_anova, type = "pearson")
 resid_df <- tibble(resid = resid, id = as.numeric(names(resid)))
 
-gg_timeline <- tibble(id = 1:nrow(data_above10), time = data_above10$datetime) %>%
+gg_timeline <- tibble(id = seq_len(nrow(data_above10)), time = data_above10$datetime) %>%
   left_join(resid_df, by = "id") %>%
   ggplot(aes(x = time, y = resid)) +
   geom_point(alpha = 0.3, col = "#222225") +
@@ -354,7 +360,7 @@ ggarrange(gg_timeline_log1, gg_timeline1, gg_timeline_log2, gg_timeline2, nrow =
 #' General overview of the daily concentration values as represented in the three timeseries.
 #' Each plot shows one species in one year. The seperate lines represent individual measurement stations.
 #' 
-## ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+## ----echo=FALSE, warning=FALSE----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 startdate <- case_when(
   species_sel == "Betula" ~ ymd_hms("2021-03-01 00:00:00"),
   species_sel == "Poaceae" ~ ymd_hms("2020-03-01 00:00:00"),
@@ -380,20 +386,33 @@ data_otheryear <- data_combined %>%
   ) %>%
   bind_rows(data_otheryear) %>%
   ggplot() +
-  geom_line(aes(x = as.Date(datetime), y = log10(value + 1), col = type, fill = station), alpha = 0.25) +
+  geom_line(aes(
+    x = as.Date(datetime),
+    y = log10(value + 1),
+    col = type,
+    fill = station
+  ), alpha = 0.25) +
   facet_wrap(~type, nrow = 3) +
   theme(legend.position = "none") +
   scale_color_manual("", values = col_hex) +
   scale_x_date(date_labels = "%d. %b") +
   xlab("") +
-  ylab(paste0("Daily Mean Log. Concentrations [Pollen/m³]")) +
-  ggtitle(paste0("Timeseries of Daily ", species_sel, " Concentrations")))
+  ylab(paste0("Daily Mean Log. Concentrations [Pollen / m³]")) +
+  ggtitle(paste0("Time Series of Daily ", "*", species_sel, "*", " Pollen Concentrations")) +
+  theme(plot.title = element_markdown()))
 
 #' 
 #' First as a boxplot and second as a histogram. 
 #' 
-## ----echo=FALSE----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-(gg_boxplot <- data_above10 %>%
+## ----echo=FALSE-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+(gg_boxplot <- data_combined %>%
+  pivot_wider(names_from = type, values_from = value) %>%
+  mutate(
+    baseline = baseline - measurement,
+    calibration = calibration - measurement
+  ) %>%
+  select(-measurement) %>%
+  pivot_longer(baseline:calibration, names_to = "type") %>%
   ggplot() +
   geom_boxplot(aes(y = value, fill = type), alpha = 0.9) +
   theme(
@@ -401,13 +420,17 @@ data_otheryear <- data_combined %>%
     axis.ticks.x = element_blank(),
     axis.text.x = element_blank()
   ) +
-  labs(y = paste0("Daily Mean Concentrations [Pollen/m³]", x = "")) +
-  coord_cartesian(y = c(0, 1000)) +
-  scale_fill_manual("", values = col_hex) +
-  ggtitle(paste0("Boxplot of Daily ", species_sel, " Concentrations")))
+  labs(y = paste0("Modelled - Measured Concentrations [Pollen / m³]", x = "")) +
+  coord_cartesian(y = c(-50, 50)) +
+  scale_fill_manual("", values = col_hex[2:3]) +
+  ggtitle(paste0(
+    "Boxplot of Daily ", "*",
+    species_sel, "*", " Pollen Concentrations Differences"
+  )) +
+  theme(plot.title = ggtext::element_markdown()))
 
 #' 
-## ----echo=FALSE----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+## ----echo=FALSE-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 sd_hirst <- data_above10 %>%
   group_by(type) %>%
   summarise(sd = sd(value))
@@ -435,8 +458,9 @@ sd_hirst <- data_above10 %>%
   theme(legend.position = "bottom") +
   scale_fill_manual(values = col_hex) +
   coord_flip() +
-  labs(x = "Occurence of Pollen Concentrations", y = "Log Mean Conc. [Pollen/m³]")) +
-  ggtitle(paste0("Histogram of Daily ", species_sel, " Concentrations"))
+  labs(x = "Occurence of Pollen Concentrations", y = "Log Mean Conc. [Pollen / m³]") +
+  ggtitle(paste0("Histogram of Daily ", "*", species_sel, "*", " Pollen Concentrations")) +
+  theme(plot.title = ggtext::element_markdown()))
 
 
 #' 
@@ -457,7 +481,7 @@ sd_hirst <- data_above10 %>%
 #' 
 #' A good summary of the methods and their shortcomings can be found here: https://www.statisticssolutions.com/correlation-Pearson-Kendall-spearman/
 #' 
-## ----include=FALSE-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+## ----include=FALSE----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 methods <- c("pearson", "spearman", "kendall")
 
@@ -475,7 +499,7 @@ corr_matrix <- map(methods, ~ corr.test(
 ))
 
 #' 
-## ----include=FALSE-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+## ----include=FALSE----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 ci <- map(corr_matrix, ~ .x %>%
   pluck(10)) %>%
   bind_rows() %>%
@@ -491,7 +515,7 @@ ci <- map(corr_matrix, ~ .x %>%
 
 
 #' 
-## ----include=FALSE-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+## ----include=FALSE----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 gg_corr1 <- data_corr %>%
   ggplot(aes(x = measurement, y = baseline)) +
   geom_point(alpha = 0.3, col = "#222225") +
@@ -499,12 +523,16 @@ gg_corr1 <- data_corr %>%
   ylim(1, 3.5) +
   geom_smooth(data = data_corr, alpha = 0.2, col = "#3081b8", fill = "#74cbee") +
   geom_abline(slope = 1, intercept = 0, col = "#cc2d2d") +
-  geom_label(data = ci %>% filter(comparison == "mb"), aes(label = label, x = x, y = y), parse = TRUE) +
+  geom_label(
+    data = ci %>% filter(comparison == "mb"),
+    aes(label = label, x = x, y = y),
+    parse = TRUE
+  ) +
   xlab("log10(measurement)") +
   ylab("log10(baseline)")
 
 #' 
-## ----include=FALSE-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+## ----include=FALSE----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 gg_corr2 <- data_corr %>%
   ggplot(aes(x = measurement, y = calibration)) +
   geom_point(alpha = 0.3, col = "#222225") +
@@ -512,22 +540,35 @@ gg_corr2 <- data_corr %>%
   ylim(1, 3.5) +
   geom_smooth(data = data_corr, alpha = 0.2, col = "#3081b8", fill = "#74cbee") +
   geom_abline(slope = 1, intercept = 0, col = "#cc2d2d") +
-  geom_label(data = ci %>% filter(comparison == "mc"), aes(label = label, x = x, y = y), parse = TRUE) +
+  geom_label(
+    data = ci %>% filter(comparison == "mc"),
+    aes(label = label, x = x, y = y),
+    parse = TRUE
+  ) +
   xlab("log10(measurement)") +
   ylab("log10(calibration)")
 
 #' 
 #' 
-## ----echo=FALSE, fig.height = 8, fig.width = 13, fig.dpi=300, out.width="100%"-------------------------------------------------------------------------------------------------------------------
+## ----echo=FALSE, warning=FALSE, message=FALSE, fig.height = 8, fig.width = 13, fig.dpi=300, out.width="100%"----------------------------------------------------------------------------------------------------
 (gg_corr <- ggarrange(gg_corr1, gg_corr2, ncol = 2) %>%
   annotate_figure(
-    top = text_grob(paste0("Pairwise Correlation Between Model and Measurements for ", species_sel, " Pollen"), size = 14),
+    top = arrangeGrob(
+      text_grob("Pairwise Correlation Between Model and Measurements for ",
+        vjust = 1.2, hjust = 0.15, size = 14
+      ),
+      text_grob(species_sel, vjust = 1.2, hjust = -3, face = "italic", size = 14),
+      text_grob(" Pollen", vjust = 1.2, hjust = 1.85, size = 14),
+      nrow = 1, padding = unit(4, "line")
+    )
     # bottom = text_grob("Pairwise correlation between Models; blue line shows the Loess smoother;
     # the red line shows a theoretical perfect correlation of 1. In the text box one can see the 95%
-    # confidence intervals of the R-values (adjusted for multiple comparison) as obtained by Pearson and two robust methods.",
+    # confidence intervals of the R-values (adjusted for multiple comparison)
+    # as obtained by Pearson and two robust methods.",
     # face = "italic", size = 10)
   )
 )
+
 
 #' 
 #' ## Altman Bland Plots
@@ -535,7 +576,7 @@ gg_corr2 <- data_corr %>%
 #' The well established AB-method for clinical trials can be used here as well to compare the means and differences between datasets. 
 #' If the points lie within the two SD-line for the differences the datasets can be assumed to be strongly associated with each other. 
 #' 
-## ----include=FALSE-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+## ----include=FALSE----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 sd_diff <- data_altman %>%
   select(starts_with("diff")) %>%
   summarise_all(~ sd(.)) %>%
@@ -562,7 +603,7 @@ gg_ab1 <- data_altman %>%
   labs(y = "Difference(Baseline - Measurement)", x = "Mean(Baseline, Measurement)")
 
 #' 
-## ----include=FALSE-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+## ----include=FALSE----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 gg_ab2 <- data_altman %>%
   ggplot(aes(x = mean_calibration, y = diff_calibration)) +
   geom_point(alpha = 0.2, col = "#222225") +
@@ -573,20 +614,25 @@ gg_ab2 <- data_altman %>%
   ) +
   geom_abline(
     slope = 0, col = "#cc2d2d",
-    intercept = sd_diff[2] * 1.96, alpha = 0.8, linetype = 3
+    intercept = sd_diff[2] * 1.96, alpha = 0.8, linetype = 3, size = 1
   ) +
   geom_abline(
     slope = 0, col = "#cc2d2d",
-    intercept = sd_diff[2] * (-1.96), alpha = 0.8, linetype = 3
+    intercept = sd_diff[2] * (-1.96), alpha = 0.8, linetype = 3, size = 1
   ) +
   geom_smooth(alpha = 0.3, col = "#3081b8", fill = "#74cbee") +
   labs(y = "Difference(Calibration - Measurement)", x = "Mean(Calibration, Measurement)")
 
 #' 
-## ----echo=FALSE, fig.height = 8, fig.width = 13, fig.dpi=300, out.width="100%"-------------------------------------------------------------------------------------------------------------------
+## ----echo=FALSE, warning=FALSE, message=FALSE, fig.height = 8, fig.width = 13, fig.dpi=300, out.width="100%"----------------------------------------------------------------------------------------------------
 (gg_ab <- ggarrange(gg_ab1, gg_ab2, ncol = 2) %>%
   annotate_figure(
-    top = text_grob(paste0("Altman-Bland Plots for ", species_sel), size = 14),
+    top = gridExtra::arrangeGrob(
+      text_grob("Bland-Altman Plots for ", vjust = 1.2, hjust = -0.7, size = 14),
+      text_grob(species_sel, vjust = 1.2, hjust = -0.83, face = "italic", size = 14),
+      text_grob(" Pollen", vjust = 1.2, hjust = 3.7, size = 14),
+      nrow = 1, padding = unit(4, "line")
+    )
     # bottom = text_grob("Pairwise comparison of Models; blue line shows the Loess smother; the red line shows a theoretical perfect
     # agreement between Model and Measurements of zero. The dashed red line shows the 2 * sd of the differences, where we expect the points to lie within.",
     #   face = "italic", size = 12)
@@ -598,7 +644,7 @@ gg_ab2 <- data_altman %>%
 #' 
 #' These plots allow to observe the error for different concentration categories.
 #' 
-## ----include=FALSE-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+## ----include=FALSE----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 categs <- c("weak", "medium", "strong", "verystrong")
 
 gg_conc_dens <- list()
@@ -611,6 +657,7 @@ xlims <- case_when(
   species_sel == "Poaceae" ~ list(50, 200, 400, 750),
   TRUE ~ list(50, 500, 1000, 2000)
 )
+xlim_box <- 100
 
 names(labels_y) <- categs
 names(xlims) <- categs
@@ -638,33 +685,44 @@ for (j in categs) {
     guides(fill = "none") +
     ggtitle(j)
 
-  gg_conc_box[[j]] <- data_impact_categories %>%
-    filter(categories_measurement == j) %>%
-    pivot_longer(measurement:calibration, names_to = "type", values_to = "Concentration") %>%
-    ggplot() +
-    # The area under that whole curve should be 1.
-    # To get an estimate of the probability of certain values,
-    # you'd have to integrate over an interval on your 'y' axis,
-    # and that value should never be greater than 1.
-    geom_boxplot(aes(x = Concentration, col = type, fill = type), alpha = 0.15) +
-    scale_colour_manual("", values = col_hex) +
-    scale_fill_manual(values = col_hex) +
-    annotate("text", x = xlims[[j]] * 0.6, y = 0.35, label = obs) +
-    coord_cartesian(xlim = c(0, xlims[[j]])) +
-    guides(fill = "none") +
-    xlab("Concentration [Pollen/m³]") +
-    ylab("") +
-    ggtitle(j) +
-    theme(axis.text.y = element_blank(), axis.text.y.left = element_blank())
+gg_conc_box[[j]] <- data_impact_categories %>%
+  mutate(
+    baseline = baseline - measurement,
+    calibration = calibration - measurement
+  ) %>%
+  select(-measurement) %>%
+  filter(categories_measurement == j) %>%
+  pivot_longer(baseline:calibration, names_to = "type", values_to = "Concentration") %>%
+  mutate(type = factor(type, levels = c("calibration", "baseline", "measurement"))) %>%
+  ggplot() +
+  # The area under that whole curve should be 1.
+  # To get an estimate of the probability of certain values,
+  # you'd have to integrate over an interval on your 'y' axis,
+  # and that value should never be greater than 1.
+  geom_boxplot(aes(x = Concentration, col = type, fill = type), alpha = 0.15) +
+  scale_colour_manual("", values = col_hex[2:3]) +
+  scale_fill_manual(values = col_hex[2:3]) +
+  annotate("text", x = xlims[[j]] * 0.6, y = 0.35, label = obs) +
+  coord_cartesian(xlim = c(-xlim_box, xlim_box)) +
+  guides(fill = "none") +
+  xlab("Concentration [Pollen / m³]") +
+  ylab("") +
+  ggtitle(j) +
+  theme(
+    axis.text.y = element_blank(),
+    axis.text.y.left = element_blank(),
+    plot.margin = margin(1, 0, 0, 0, "cm")
+  )
+  xlim_box = xlim_box + 150
 }
 
 #' 
-## ----echo=FALSE, fig.height = 8, fig.width = 13, fig.dpi=300, out.width="100%"-------------------------------------------------------------------------------------------------------------------
+## ----echo=FALSE, fig.height = 8, fig.width = 13, fig.dpi=300, out.width="100%"----------------------------------------------------------------------------------------------------------------------------------
 (gg_dens_conc <- ggarrange(plotlist = gg_conc_dens) %>%
   annotate_figure(
     top = paste0(
       "Comparison of Measurements and Model Predictions for ", species_sel,
-      " for All Stations and Different Concentration Groups."
+      " Pollen for All Stations and Different Concentration Groups."
     ),
     bottom = text_grob(paste0(
       "We are looking at Density Kernel Estimators ",
@@ -681,21 +739,32 @@ for (j in categs) {
 
 
 #' 
-## ----echo=FALSE, fig.height = 8, fig.width = 13, fig.dpi=300, out.width="100%"-------------------------------------------------------------------------------------------------------------------
-(gg_boxplot_conc <- ggarrange(plotlist = gg_conc_box, common.legend = TRUE, legend = "right") %>%
+## ----echo=FALSE, fig.height = 8, fig.width = 13, fig.dpi=300, out.width="100%"----------------------------------------------------------------------------------------------------------------------------------
+(gg_boxplot_conc <- ggarrange(
+  plotlist = gg_conc_box,
+  common.legend = TRUE,
+  legend = "right",
+  vjust = 5
+) %>%
   annotate_figure(
-    top = text_grob(paste(
-      "Model vs. Measurement Boxplot Comparison for Different Health Impact Groups"
-    ), size = 14),
+    top = gridExtra::arrangeGrob(
+      text_grob("Model vs. Measurement Boxplot Comparison for Different Health Impact Groups for ",
+        vjust = 1.2, hjust = 0.18, size = 12
+      ),
+      text_grob(species_sel, vjust = 1.2, hjust = -6, face = "italic", size = 12),
+      text_grob(" Pollen", vjust = 1.2, hjust = -0.4, size = 12),
+      nrow = 1, padding = unit(4, "line")
+    )
     # bottom = text_grob(paste0("We are looking at Boxplots for different health impact groups to
     # investigate the differences between modeled and measured concentrations"),
     #   face = "italic",
     #   size = 10)
   ))
 
+
 #' 
 #' 
-## ----echo=FALSE----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+## ----echo=FALSE-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 data_impact_categories %>%
   mutate(
     diff_baseline = baseline - measurement,
@@ -708,9 +777,13 @@ data_impact_categories %>%
   scale_fill_manual("", values = col_hex[2:3]) +
   #  scale_y_continuous(trans='log10') +
   coord_cartesian(ylim = c(-500, 1000)) +
-  ggtitle(paste("Differences Between Modelled and Measured", species_sel, "Concentrations")) +
+  ggtitle(paste(
+    "Differences Between Modelled and Measured",
+    species_sel,
+    " Pollen Concentrations"
+  )) +
   xlab("") +
-  ylab("Concentration [1/m³]") +
+  ylab("Concentration [Pollen / m³]") +
   theme(legend.position = "bottom")
 
 #' 
@@ -718,7 +791,7 @@ data_impact_categories %>%
 #' 
 #' First, various metrics are compared where the pollen concentrations are considered a continuous numerical variable.
 #' 
-## ----echo=FALSE----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+## ----echo=FALSE-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 metrics_baseline <- data_above10 %>%
   pivot_wider(names_from = type) %>%
   filter(!is.na(baseline)) %>%
@@ -768,7 +841,7 @@ metrics_baseline %>%
 #' The Kappa metric is explained here and was chosen as the most meaningful metric for this analysis:
 #' https://towardsdatascience.com/multi-class-metrics-made-simple-the-kappa-score-aka-cohens-kappa-coefficient-bdea137af09c
 #' 
-## ----echo=FALSE----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+## ----echo=FALSE-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 matrix_baseline <- confusionMatrix(
   data_impact_categories_above10$categories_baseline,
   data_impact_categories_above10$categories_measurement
@@ -806,12 +879,19 @@ kappa_baseline %>%
 #' We can treat them as numerical values from 0:nothing - 4: very strong.
 #' 
 #' 
-## ----echo=FALSE----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+## ----echo=FALSE-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 my_header <- c(seciesl_sel = 2)
 names(my_header) <- species_sel
 
 data_impact_categories_above10 %>%
-  select(taxon, station, datetime, categories_measurement, categories_baseline, categories_calibration) %>%
+  select(
+    taxon,
+    station,
+    datetime,
+    categories_measurement,
+    categories_baseline,
+    categories_calibration
+  ) %>%
   mutate(across(categories_measurement:categories_calibration, ~ as.numeric(.x)),
     error_baseline = categories_baseline - categories_measurement,
     error_calibration = categories_calibration - categories_measurement
@@ -847,7 +927,7 @@ data_impact_categories_above10 %>%
 #' - Recall = A/(A+C)
 #' - F1 = (1+beta^2)*precision*recall/((beta^2 * precision)+recall)
 #' 
-## ----echo=FALSE----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+## ----echo=FALSE-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 my_header <- c(seciesl_sel = 13)
 names(my_header) <- species_sel
 
@@ -900,12 +980,11 @@ matrix_baseline$byClass %>%
 #' The Estimator can also be interpreted as a proxy for the relative difference in median between Model and Measurements.
 #' If the Estimator is > 0.5 then the model tends to have larger measurements.
 #' 
-## ----echo=FALSE----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+## ----echo=FALSE-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 npar_contr <-
-  nparcomp(
+  nparcomp_adjusted(
     value ~ type,
     data = data_above10,
-    # slice(1:3870),
     conf.level = 0.95,
     alternative = "two.sided",
     type = "Dunnet",
@@ -913,7 +992,7 @@ npar_contr <-
   )
 
 title <- paste(
-  "Robust Contrasts and Confidence Intervals for", species_sel, "Measurements"
+  "Robust Contrasts and Confidence Intervals for", species_sel, " Pollen Measurements"
 )
 myheader <- c(title = 6)
 names(myheader) <- title
@@ -930,11 +1009,253 @@ npar_contr$Analysis %>%
   add_header_above(myheader)
 
 #' 
-## ----paper---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+## ----paper, include=FALSE---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 # Export plots for paper
 ggsave("vignettes/gg_timeseries.png", gg_timeseries, width = 9, height = 6, bg = "white", dpi = 300)
 ggsave("vignettes/gg_boxplot.png", gg_boxplot, width = 9, height = 7, bg = "white", dpi = 300)
 ggsave("vignettes/gg_corr.png", gg_corr, width = 10, height = 6, bg = "white", dpi = 300)
 ggsave("vignettes/gg_ab.png", gg_ab, width = 10, height = 6, bg = "white", dpi = 300)
-ggsave("vignettes/gg_boxplot_conc.png", gg_boxplot_conc, width = 9, height = 7, bg = "white", dpi = 300)
+ggsave("vignettes/gg_boxplot_conc.png",
+  gg_boxplot_conc,
+  width = 9,
+  height = 7,
+  bg = "white",
+  dpi = 300
+)
+
+#' 
+#' Reviewer 1 requested an additional graph displaying the changes of the tune factor over the course
+#' of a season. The following chunk loads the data and saves a line-plot:
+#' 
+#' Final version of the model:
+#' 
+#' - 5 days were regarded for the threshold, the sum of all hourly values had to surpass 720.
+#' - In addition the last 24h were regarded for the threshold, the sum of all hourly values had to surpass 240.
+#' - The full update to the tuning factor happens once per day -> 24th root
+#' - Tuning factor was limited based on climatologically observed minima and maxima
+#' 
+## ----echo=FALSE-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+tune_20 <- import_data_cosmo(paste0(here(), "/ext-data/cosmo/20_alnu_tune"), type = "tune")
+tune_21 <- import_data_cosmo(paste0(here(), "/ext-data/cosmo/21_alnu_tune"), type = "tune")
+
+gg_tune <- tune_20 %>%
+  aggregate_pollen() %>%
+  mutate(
+    datetime = datetime + years(1),
+    value = value / 0.34,
+    season = "season_2020") %>%
+  bind_rows(tune_21 %>%
+    aggregate_pollen() %>%
+    mutate(season = "season_2021")) %>%
+  filter(
+    taxon == species_sel,
+    station != "Wolfgang",
+    between(datetime, startdate, enddate),
+  ) %>%
+  ggplot() +
+  geom_line(aes(
+    x = as.Date(datetime),
+    y = value,
+    col = season), alpha = 0.25) +
+  facet_wrap(~station) +
+  coord_cartesian(y = c(0, 7)) +
+  theme(legend.title = element_blank(), legend.position = "bottom",
+    axis.text=element_text(size=7)) +
+  scale_x_date(date_labels = "%e.%b") +
+  xlab("") +
+  ylab(paste0("")) +
+  ggtitle(paste0("Daily Mean Tuning Factor Values (ALNUtune) - Final Version"))
+
+ggsave("vignettes/gg_tune.png", gg_tune, width = 9, height = 6, bg = "white", dpi = 300)
+
+gg_tune
+
+#' 
+#' Version 2 below had the following settings:
+#' 
+#' - Only last 5 days were regarded for the threshold, the sum of all hourly values had to surpass 720.
+#' - The update to the tuning factor happened slowly (conservatively) -> 120th root
+#' - Tuning factor was unlimited
+#' 
+## ----echo=FALSE-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+tune_20_v2 <- import_data_cosmo(paste0(here(), "/ext-data/cosmo/20_alnu_tune_v2"), type = "tune")
+tune_21_v2 <- import_data_cosmo(paste0(here(), "/ext-data/cosmo/21_alnu_tune_v2"), type = "tune")
+
+gg_tune_v2 <- tune_20_v2 %>%
+  aggregate_pollen() %>%
+  mutate(
+    datetime = datetime + years(1),
+    season = "season_2020") %>%
+  bind_rows(tune_21_v2 %>%
+    aggregate_pollen() %>%
+    mutate(season = "season_2021")) %>%
+  mutate(value = value / 0.34) %>%
+  filter(
+    taxon == species_sel,
+    station != "Wolfgang",
+    between(datetime, startdate, enddate),
+  ) %>%
+  ggplot() +
+  geom_line(aes(
+    x = as.Date(datetime),
+    y = value,
+    col = season), alpha = 0.25) +
+  facet_wrap(~station) +
+  coord_cartesian(y = c(0, 7)) +
+  theme(
+    legend.title = element_blank(), legend.position = "bottom",
+    axis.text = element_text(size = 7)
+  ) +
+    scale_x_date(date_labels = "%e.%b") +
+    xlab("") +
+    ylab(paste0("")) +
+    ggtitle(paste0("Daily Mean Tuning Factor Values (ALNUtune)"))
+
+ggsave("vignettes/gg_tune_v2.png", gg_tune_v2, width = 9, height = 6, bg = "white", dpi = 300)
+
+gg_tune_v2
+
+#' 
+#' Version 4 has the same setup as the final version except:
+#' - The change to the tuning factor happens every hour in full (no root)
+#' 
+## ----echo=FALSE-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+tune_20_v4 <- import_data_cosmo(paste0(here(), "/ext-data/cosmo/20_alnu_tune_v4"), type = "tune")
+tune_21_v4 <- import_data_cosmo(paste0(here(), "/ext-data/cosmo/21_alnu_tune_v4"), type = "tune")
+
+gg_tune_v4 <- tune_20_v4 %>%
+  aggregate_pollen() %>%
+  mutate(
+    datetime = datetime + years(1),
+    season = "season_2020") %>%
+  bind_rows(tune_21_v4 %>%
+    aggregate_pollen() %>%
+    mutate(season = "season_2021")) %>%
+  mutate(value = value / 0.34) %>%
+  filter(
+    taxon == species_sel,
+    station != "Wolfgang",
+    between(datetime, startdate, enddate),
+  ) %>%
+  ggplot() +
+  geom_line(aes(
+    x = as.Date(datetime),
+    y = value,
+    col = season), alpha = 0.25) +
+  facet_wrap(~station) +
+  coord_cartesian(y = c(0, 7)) +
+  theme(
+    legend.title = element_blank(), legend.position = "bottom",
+    axis.text = element_text(size = 7)
+  ) +
+    scale_x_date(date_labels = "%e.%b") +
+    xlab("") +
+    ylab(paste0("")) +
+    ggtitle(paste0("Daily Mean Tuning Factor Values (ALNUtune)"))
+
+  ggsave("vignettes/gg_tune_v4.png", gg_tune_v4, width = 9, height = 6, bg = "white", dpi = 300)
+
+gg_tune_v4
+
+#' 
+#' Version 6 had the same setup as the final version, but the changes to the tuning factor were
+#' calculated based on the past 24h hours only:
+#' 
+## ----echo=FALSE-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+tune_20_v6 <- import_data_cosmo(paste0(here(), "/ext-data/cosmo/20_alnu_tune_v6"), type = "tune")
+
+gg_tune_v6 <- tune_20_v6 %>%
+  aggregate_pollen() %>%
+  mutate(
+    datetime = datetime + years(1),
+    season = "season_2020",
+    value = value / 0.34) %>%
+  filter(
+    taxon == species_sel,
+    station != "Wolfgang",
+    between(datetime, startdate, enddate),
+  ) %>%
+  ggplot() +
+  geom_line(aes(
+    x = as.Date(datetime),
+    y = value,
+    col = season), alpha = 0.25) +
+  facet_wrap(~station) +
+  coord_cartesian(y = c(0, 7)) +
+  theme(
+    legend.title = element_blank(), legend.position = "bottom",
+    axis.text = element_text(size = 7)
+  ) +
+    scale_x_date(date_labels = "%e.%b") +
+    xlab("") +
+    ylab(paste0("")) +
+    ggtitle(paste0("Daily Mean Tuning Factor Values (ALNUtune)"))
+
+  ggsave("vignettes/gg_tune_v6.png", gg_tune_v4, width = 9, height = 6, bg = "white", dpi = 300)
+
+gg_tune_v6
+
+#' 
+#' Reviewer 2 requested a similar graph faceted by station but for the concentrations.
+#' 
+## ----echo=FALSE-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+gg_timeseries_2020 <- data_combined %>%
+  filter(
+    taxon == species_sel,
+    year(datetime) == 2020
+  ) %>%
+  ggplot() +
+  geom_line(aes(
+    x = as.Date(datetime),
+    y = value,
+    col = type), alpha = 0.25) +
+  facet_wrap(~station) +
+    theme(
+      legend.title = element_blank(), legend.position = "bottom",
+      axis.text = element_text(size = 7)
+    ) +
+    scale_x_date(date_labels = "%e.%b") +
+    xlab("") +
+    ylab(paste0("")) +
+    ylab(paste0("Daily Mean Concentrations [Pollen / m³]")) +
+    ggtitle(paste0("Time Series of Daily Alnus Pollen Concentrations in the 2020 Season")) +
+    scale_color_manual("", values = col_hex) +
+    coord_cartesian(y = c(0, 1000))
+
+
+gg_timeseries_2021 <- data_combined %>%
+  filter(
+    taxon == species_sel,
+    year(datetime) == 2021
+  ) %>%
+  ggplot() +
+  geom_line(aes(
+    x = as.Date(datetime),
+    y = value,
+    col = type), alpha = 0.25) +
+  facet_wrap(~station) +
+    theme(
+      legend.title = element_blank(), legend.position = "bottom",
+      axis.text = element_text(size = 7)
+    ) +
+    scale_x_date(date_labels = "%e.%b") +
+    xlab("") +
+    ylab(paste0("")) +
+    ylab(paste0("Daily Mean Concentrations [Pollen / m³]")) +
+    ggtitle(paste0("Time Series of Daily Alnus Pollen Concentrations in the 2021 Season")) +
+    scale_color_manual("", values = col_hex) +
+    coord_cartesian(y = c(0, 1000))
+
+ggsave("vignettes/gg_timeseries_2020.png",
+  gg_timeseries_2020,
+  width = 9, height = 6, bg = "white", dpi = 300
+)
+ggsave("vignettes/gg_timeseries_2021.png",
+  gg_timeseries_2021,
+  width = 9, height = 6, bg = "white", dpi = 300
+)
+
+gg_timeseries_2020
+gg_timeseries_2021
 
