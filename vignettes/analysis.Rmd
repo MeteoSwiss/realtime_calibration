@@ -702,7 +702,7 @@ gg_conc_box[[j]] <- data_impact_categories %>%
   geom_boxplot(aes(x = Concentration, col = type, fill = type), alpha = 0.15) +
   scale_colour_manual("", values = col_hex[2:3]) +
   scale_fill_manual(values = col_hex[2:3]) +
-  annotate("text", x = xlims[[j]] * 0.6, y = 0.35, label = obs) +
+  annotate("text", x = xlim_box * 0.54, y = 0.4, label = obs, size = 3.5, alpha = 0.7) +
   coord_cartesian(xlim = c(-xlim_box, xlim_box)) +
   guides(fill = "none") +
   xlab("Concentration [Pollen / m³]") +
@@ -713,7 +713,7 @@ gg_conc_box[[j]] <- data_impact_categories %>%
     axis.text.y.left = element_blank(),
     plot.margin = margin(1, 0, 0, 0, "cm")
   )
-  xlim_box = xlim_box + 150
+  xlim_box <- xlim_box + 150
 }
 ```
 
@@ -1009,7 +1009,7 @@ npar_contr$Analysis %>%
   add_header_above(myheader)
 ```
 
-```{r paper, include=FALSE}
+```{r paper_plots, include=FALSE}
 # Export plots for paper
 ggsave("vignettes/gg_timeseries.png", gg_timeseries, width = 9, height = 6, bg = "white", dpi = 300)
 ggsave("vignettes/gg_boxplot.png", gg_boxplot, width = 9, height = 7, bg = "white", dpi = 300)
