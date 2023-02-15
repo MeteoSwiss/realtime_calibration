@@ -1060,7 +1060,7 @@ if (species_sel == "Alnus") {
       x = as.Date(datetime),
       y = value,
       col = season
-    ), alpha = 0.25) +
+    ), alpha = 0.6) +
     facet_wrap(~station) +
     coord_cartesian(y = c(0, 7)) +
     theme(
@@ -1109,7 +1109,7 @@ if (species_sel == "Alnus") {
       x = as.Date(datetime),
       y = value,
       col = season
-    ), alpha = 0.25) +
+    ), alpha = 0.6) +
     facet_wrap(~station) +
     coord_cartesian(y = c(0, 7)) +
     theme(
@@ -1156,7 +1156,7 @@ if (species_sel == "Alnus") {
       x = as.Date(datetime),
       y = value,
       col = season
-    ), alpha = 0.25) +
+    ), alpha = 0.6) +
     facet_wrap(~station) +
     coord_cartesian(y = c(0, 7)) +
     theme(
@@ -1198,7 +1198,7 @@ if (species_sel == "Alnus") {
       x = as.Date(datetime),
       y = value,
       col = season
-    ), alpha = 0.25) +
+    ), alpha = 0.6) +
     facet_wrap(~station) +
     coord_cartesian(y = c(0, 7)) +
     theme(
@@ -1230,7 +1230,7 @@ if (species_sel == "Alnus") {
       x = as.Date(datetime),
       y = value,
       col = type
-    ), alpha = 0.25) +
+    ), alpha = 0.6) +
     facet_wrap(~station) +
     theme(
       legend.title = element_blank(), legend.position = "bottom",
@@ -1255,7 +1255,7 @@ if (species_sel == "Alnus") {
       x = as.Date(datetime),
       y = value,
       col = type
-    ), alpha = 0.25) +
+    ), alpha = 0.6) +
     facet_wrap(~station) +
     theme(
       legend.title = element_blank(), legend.position = "bottom",
