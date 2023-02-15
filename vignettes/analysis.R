@@ -1277,16 +1277,16 @@ if (species_sel == "Alnus") {
 #' 
 ## ----paper, include=FALSE-------------------------------------------------------------------------------------------------------------------------------------------------------------------
 # Export plots for paper
-ggsave("vignettes/gg_tune.png", gg_tune, width = 10, height = 6, bg = "white", dpi = 300)
-ggsave("vignettes/gg_tune_v2.png", gg_tune_v2, width = 10, height = 6, bg = "white", dpi = 300)
-ggsave("vignettes/gg_tune_v4.png", gg_tune_v4, width = 10, height = 6, bg = "white", dpi = 300)
-ggsave("vignettes/gg_tune_v6.png", gg_tune_v6, width = 10, height = 6, bg = "white", dpi = 300)
+ggsave("vignettes/gg_tune.png", gg_tune, width = 10, height = 6.5, bg = "white", dpi = 300)
+ggsave("vignettes/gg_tune_v2.png", gg_tune_v2, width = 10, height = 6.5, bg = "white", dpi = 300)
+ggsave("vignettes/gg_tune_v4.png", gg_tune_v4, width = 10, height = 6.5, bg = "white", dpi = 300)
+ggsave("vignettes/gg_tune_v6.png", gg_tune_v6, width = 10, height = 6.5, bg = "white", dpi = 300)
 ggsave("vignettes/gg_timeseries_2020.png",
   gg_timeseries_2020,
-  width = 10, height = 6, bg = "white", dpi = 300
+  width = 10, height = 6.5, bg = "white", dpi = 300
 )
 ggsave("vignettes/gg_timeseries_2021.png",
   gg_timeseries_2021,
-  width = 10, height = 6, bg = "white", dpi = 300
+  width = 10, height = 6.5, bg = "white", dpi = 300
 )
 
