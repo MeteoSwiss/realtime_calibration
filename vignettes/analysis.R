@@ -228,7 +228,6 @@ data_impact_categories <- data_combined %>%
 data_impact_categories_above10 <- data_impact_categories %>%
   filter(measurement > threshold)
 
-
 #' 
 #' ## Residual Analysis
 #' 
@@ -248,7 +247,6 @@ data_impact_categories_above10 <- data_impact_categories %>%
 op <- options(contrasts = c("contr.sum", "contr.poly"))
 fit_anova <- aov(as.formula(paste("value ~ type")), data = data_above10)
 fit_anova_log <- aov(as.formula(paste("value ~ type")), data = data_log10)
-
 
 #' 
 #' ### Are the errors independent?
@@ -299,7 +297,6 @@ gg_tukey2 <-
 ggarrange(gg_tukey1, gg_tukey2) %>%
   annotate_figure(top = "Tukey Anscombe - Plot for the ANOVA Residuals With (left) and Without Logarithmizing")
 
-
 #' 
 #' ### Are the errors normally distributed?
 #' 
@@ -347,7 +344,6 @@ gg_timeline2 <- gg_timeline + coord_cartesian(x = c(start_date + years(1), end_d
 
 ggarrange(gg_timeline_log1, gg_timeline1, gg_timeline_log2, gg_timeline2, nrow = 2, ncol = 2) %>%
   annotate_figure(top = "Index-Plot for the ANOVA Residuals With (left) and Without Logarithmizing")
-
 
 #' 
 #' Summary: Redidual Analysis shows that the assumptions of "normal" statiscal methods are validated even for log(daily values).
@@ -437,11 +433,12 @@ sd_hirst <- data_above10 %>%
 
 (gg_hist <- data_log10 %>%
   ggplot() +
-  geom_histogram(aes(
-    y = value,
-    fill = type
-  ),
-  binwidth = 0.1
+  geom_histogram(
+    aes(
+      y = value,
+      fill = type
+    ),
+    binwidth = 0.1
   ) +
   geom_label(
     data = sd_hirst,
@@ -461,7 +458,6 @@ sd_hirst <- data_above10 %>%
   labs(x = "Occurence of Pollen Concentrations", y = "Log Mean Conc. [Pollen / m³]") +
   ggtitle(paste0("Histogram of Daily ", "*", species_sel, "*", " Pollen Concentrations")) +
   theme(plot.title = ggtext::element_markdown()))
-
 
 #' 
 #' ### Correlation Plots
@@ -512,7 +508,6 @@ ci <- map(corr_matrix, ~ .x %>%
     x = rep(c(2.5, 2.55, 2.5), each = 3),
     y = rep(c(1, 1.15, 1.3), each = 3)
   )
-
 
 #' 
 ## ----include=FALSE--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -568,7 +563,6 @@ gg_corr2 <- data_corr %>%
     # face = "italic", size = 10)
   )
 )
-
 
 #' 
 #' ## Altman Bland Plots
@@ -638,7 +632,6 @@ gg_ab2 <- data_altman %>%
     #   face = "italic", size = 12)
   ))
 
-
 #' 
 #' ## Density Plots
 #' 
@@ -685,34 +678,34 @@ for (j in categs) {
     guides(fill = "none") +
     ggtitle(j)
 
-gg_conc_box[[j]] <- data_impact_categories %>%
-  mutate(
-    baseline = baseline - measurement,
-    calibration = calibration - measurement
-  ) %>%
-  select(-measurement) %>%
-  filter(categories_measurement == j) %>%
-  pivot_longer(baseline:calibration, names_to = "type", values_to = "Concentration") %>%
-  mutate(type = factor(type, levels = c("calibration", "baseline", "measurement"))) %>%
-  ggplot() +
-  # The area under that whole curve should be 1.
-  # To get an estimate of the probability of certain values,
-  # you'd have to integrate over an interval on your 'y' axis,
-  # and that value should never be greater than 1.
-  geom_boxplot(aes(x = Concentration, col = type, fill = type), alpha = 0.15) +
-  scale_colour_manual("", values = col_hex[2:3]) +
-  scale_fill_manual(values = col_hex[2:3]) +
-  annotate("text", x = xlim_box * 0.54, y = 0.4, label = obs, size = 3.5, alpha = 0.7) +
-  coord_cartesian(xlim = c(-xlim_box, xlim_box)) +
-  guides(fill = "none") +
-  xlab("Concentration [Pollen / m³]") +
-  ylab("") +
-  ggtitle(j) +
-  theme(
-    axis.text.y = element_blank(),
-    axis.text.y.left = element_blank(),
-    plot.margin = margin(1, 0, 0, 0, "cm")
-  )
+  gg_conc_box[[j]] <- data_impact_categories %>%
+    mutate(
+      baseline = baseline - measurement,
+      calibration = calibration - measurement
+    ) %>%
+    select(-measurement) %>%
+    filter(categories_measurement == j) %>%
+    pivot_longer(baseline:calibration, names_to = "type", values_to = "Concentration") %>%
+    mutate(type = factor(type, levels = c("calibration", "baseline", "measurement"))) %>%
+    ggplot() +
+    # The area under that whole curve should be 1.
+    # To get an estimate of the probability of certain values,
+    # you'd have to integrate over an interval on your 'y' axis,
+    # and that value should never be greater than 1.
+    geom_boxplot(aes(x = Concentration, col = type, fill = type), alpha = 0.15) +
+    scale_colour_manual("", values = col_hex[2:3]) +
+    scale_fill_manual(values = col_hex[2:3]) +
+    annotate("text", x = xlim_box * 0.54, y = 0.4, label = obs, size = 3.5, alpha = 0.7) +
+    coord_cartesian(xlim = c(-xlim_box, xlim_box)) +
+    guides(fill = "none") +
+    xlab("Concentration [Pollen / m³]") +
+    ylab("") +
+    ggtitle(j) +
+    theme(
+      axis.text.y = element_blank(),
+      axis.text.y.left = element_blank(),
+      plot.margin = margin(1, 0, 0, 0, "cm")
+    )
   xlim_box <- xlim_box + 150
 }
 
@@ -724,19 +717,19 @@ gg_conc_box[[j]] <- data_impact_categories %>%
       "Comparison of Measurements and Model Predictions for ", species_sel,
       " Pollen for All Stations and Different Concentration Groups."
     ),
-    bottom = text_grob(paste0(
-      "We are looking at Density Kernel Estimators ",
-      "for all three timeseries to compare the measurements between them. ",
-      "\n The area under each curve adds up to 1 and makes it possible ",
-      "to vizualise the (dis-)similarities of measurements from the ",
-      "three timeseries. \n It is basically a smoothed histogram. ",
-      "The buckets are based on the mean concentrations of measurements and model."
-    ),
-    face = "italic",
-    size = 10
+    bottom = text_grob(
+      paste0(
+        "We are looking at Density Kernel Estimators ",
+        "for all three timeseries to compare the measurements between them. ",
+        "\n The area under each curve adds up to 1 and makes it possible ",
+        "to vizualise the (dis-)similarities of measurements from the ",
+        "three timeseries. \n It is basically a smoothed histogram. ",
+        "The buckets are based on the mean concentrations of measurements and model."
+      ),
+      face = "italic",
+      size = 10
     )
   ))
-
 
 #' 
 ## ----echo=FALSE, fig.height = 8, fig.width = 13, fig.dpi=300, out.width="100%"--------------------------------------------------------------------------------------------------------------
@@ -760,7 +753,6 @@ gg_conc_box[[j]] <- data_impact_categories %>%
     #   face = "italic",
     #   size = 10)
   ))
-
 
 #' 
 #' 
@@ -1285,8 +1277,8 @@ if (species_sel == "Alnus") {
 #' 
 ## ----paper, include=FALSE-------------------------------------------------------------------------------------------------------------------------------------------------------------------
 # Export plots for paper
-ggsave("vignettes/gg_tune.png", gg_tune, width = 9, height = 6, bg = "white", dpi = 300)
-ggsave("vignettes/gg_tune_v2.png", gg_tune_v2, width = 9, height = 7, bg = "white", dpi = 300)
+ggsave("vignettes/gg_tune.png", gg_tune, width = 10, height = 6, bg = "white", dpi = 300)
+ggsave("vignettes/gg_tune_v2.png", gg_tune_v2, width = 10, height = 6, bg = "white", dpi = 300)
 ggsave("vignettes/gg_tune_v4.png", gg_tune_v4, width = 10, height = 6, bg = "white", dpi = 300)
 ggsave("vignettes/gg_tune_v6.png", gg_tune_v6, width = 10, height = 6, bg = "white", dpi = 300)
 ggsave("vignettes/gg_timeseries_2020.png",
