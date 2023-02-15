@@ -14,8 +14,7 @@
 # THE USER CAN SELECT A SPECIES HERE!
 # Alnus, Betula, Corylus or Poaceae (Alder, Birch, Hazel or Grasses)
 
-species_sel <- "Alnus"
-threshold <- 1
+species_sel <- "Poaceae"
 
 #' 
 #' In this project we want to evaluate the new pollen forecast module that uses "realtime data"
@@ -80,12 +79,13 @@ load(paste0(here(), "/data/dwh/data_dwh.RData"))
 #' - _baseline_ referring to daily pollen concentration forecasts from the COSMO-1E model *without* calibraton module
 #' - _calibration_ referring to daily pollen concentration forecasts from the COSMO-1E model *with* calibraton module
 #' 
-#' We have four species available for this analysis:
+#' We have four species available for this analysis.
+#' The months were selected with our pollen experts and data was retrieved from the model runs.
 #' 
-#' - Alnus from for the pollen seasons 2020-2021
-#' - Betula from for the pollen seasons 2020-2021
-#' - Corylus from for the pollen seasons 2020-2021
-#' - Poaceae from for the pollen seasons 2019-2020
+#' - Alnus from for the pollen seasons 2020-2021 (January - March)
+#' - Betula from for the pollen seasons 2020-2021 (March - June)
+#' - Corylus from for the pollen seasons 2020-2021 (January - March)
+#' - Poaceae from for the pollen seasons 2019-2020 (March - October)
 #' 
 #' The analysis will be carried out for each species individually, but all for all stations and both years combined.
 #' 
@@ -96,19 +96,8 @@ load(paste0(here(), "/data/dwh/data_dwh.RData"))
 #' 
 #' - The temporal resolution for this analysis is daily averages - pollen verification can be sensitive to temporal resolution
 #' - The species of pollen can be assessed individually or combined 
-#' - The threshold below which Pollen measurements are excluded from the data is set to 10 currently, as they become unreliant
 #' 
-#' Observations of low pollen concentrations are uncertain. Therefore, times-
-#' tamps with modelled or measured values can be removed from all three
-#' data sets for the numerical analysis using the variable in the first chunk of this vignette.
-#' This symmetrical exclusion is necessary to make sure that no artificial biases are introduced.
-#' For the analyses carried out for specific health impact based categories (i.e. concentration bins),
-#' timestamps with **measured** values < *threshold* are removed only (i.e. modelled values are allowed
-#' to be < *threshold*. This asymmetrical exclusion is justified for the investigation of
-#' relative changes in categorical metrics. In the time series plot (Figure 1) and the
-#' boxplot (Figure 5) values < *threshold* are not removed at all for better visibility.
-#' Whether low values < *threshold* were removed are not will be denoted in all figure captions and 
-#' should allow the reader to get a full picture of the data.
+#' The measured and modelled values were artificially increased by 0.001 to enable taking the log and division by zero.
 #' 
 ## ----include=FALSE--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 data_combined <- data_dwh %>%
@@ -124,19 +113,15 @@ data_combined <- data_dwh %>%
     taxon == species_sel,
     station != "Wolfgang"
   ) %>%
-  mutate(type = factor(type, ordered = TRUE, levels = c("measurement", "baseline", "calibration")))
+  mutate(
+    type = factor(type, ordered = TRUE, levels = c("measurement", "baseline", "calibration")),
+    value = value + 0.001
+  )
 
-data_above10 <- data_combined %>%
-  pivot_wider(names_from = type) %>%
-  filter(measurement > threshold, baseline > threshold, calibration > threshold) %>%
-  pivot_longer(measurement:calibration, names_to = "type", values_to = "value") %>%
-  mutate(type = factor(type, ordered = TRUE, levels = c("measurement", "baseline", "calibration")))
+data_log <- data_combined %>%
+  mutate(value = log10(value))
 
-
-data_log10 <- data_above10 %>%
-  mutate(value = log10(value + 0.0001))
-
-data_altman <- data_above10 %>%
+data_altman <- data_combined %>%
   pivot_wider(names_from = type) %>%
   select(datetime, measurement, baseline, calibration) %>%
   mutate(
@@ -146,7 +131,7 @@ data_altman <- data_above10 %>%
     diff_calibration = calibration - measurement
   )
 
-data_corr <- data_log10 %>%
+data_corr <- data_log %>%
   pivot_wider(names_from = type) %>%
   select(datetime, measurement, baseline, calibration)
 
@@ -225,9 +210,6 @@ data_impact_categories <- data_combined %>%
     ~ factor(., levels = c("nothing", "weak", "medium", "strong", "verystrong"))
   )
 
-data_impact_categories_above10 <- data_impact_categories %>%
-  filter(measurement > threshold)
-
 #' 
 #' ## Residual Analysis
 #' 
@@ -245,8 +227,8 @@ data_impact_categories_above10 <- data_impact_categories %>%
 #' 
 ## ----echo=FALSE-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 op <- options(contrasts = c("contr.sum", "contr.poly"))
-fit_anova <- aov(as.formula(paste("value ~ type")), data = data_above10)
-fit_anova_log <- aov(as.formula(paste("value ~ type")), data = data_log10)
+fit_anova <- aov(as.formula(paste("value ~ type")), data = data_combined)
+fit_anova_log <- aov(as.formula(paste("value ~ type")), data = data_log)
 
 #' 
 #' ### Are the errors independent?
@@ -311,7 +293,7 @@ ggarrange(gg_tukey1, gg_tukey2) %>%
 resid <- residuals(fit_anova_log, type = "pearson")
 resid_df <- tibble(resid = resid, id = as.numeric(names(resid)))
 
-gg_timeline_log <- tibble(id = seq_len(nrow(data_log10)), time = data_log10$datetime) %>%
+gg_timeline_log <- tibble(id = seq_len(nrow(data_log)), time = data_log$datetime) %>%
   left_join(resid_df, by = "id") %>%
   ggplot(aes(x = time, y = resid)) +
   geom_point(alpha = 0.3, col = "#222225") +
@@ -320,7 +302,7 @@ gg_timeline_log <- tibble(id = seq_len(nrow(data_log10)), time = data_log10$date
 resid <- residuals(fit_anova, type = "pearson")
 resid_df <- tibble(resid = resid, id = as.numeric(names(resid)))
 
-gg_timeline <- tibble(id = seq_len(nrow(data_above10)), time = data_above10$datetime) %>%
+gg_timeline <- tibble(id = seq_len(nrow(data_combined)), time = data_combined$datetime) %>%
   left_join(resid_df, by = "id") %>%
   ggplot(aes(x = time, y = resid)) +
   geom_point(alpha = 0.3, col = "#222225") +
@@ -398,7 +380,7 @@ data_otheryear <- data_combined %>%
   theme(plot.title = element_markdown()))
 
 #' 
-#' First as a boxplot and second as a histogram. 
+#' First as a boxplot and second as a histogram of the daily differences. 
 #' 
 ## ----echo=FALSE-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 (gg_boxplot <- data_combined %>%
@@ -427,11 +409,11 @@ data_otheryear <- data_combined %>%
 
 #' 
 ## ----echo=FALSE-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-sd_hirst <- data_above10 %>%
+sd_hirst <- data_combined %>%
   group_by(type) %>%
   summarise(sd = sd(value))
 
-(gg_hist <- data_log10 %>%
+(gg_hist <- data_log %>%
   ggplot() +
   geom_histogram(
     aes(
@@ -444,7 +426,7 @@ sd_hirst <- data_above10 %>%
     data = sd_hirst,
     aes(
       label = paste("Standard Deviation:\n", round(sd), "Pollen / m³"),
-      x = 30,
+      x = 400,
       y = 3,
       group = type
     ),
@@ -580,7 +562,7 @@ sd_diff <- data_altman %>%
 gg_ab1 <- data_altman %>%
   ggplot(aes(x = mean_baseline, y = diff_baseline)) +
   geom_point(alpha = 0.2, col = "#222225") +
-  xlim(0, 500) +
+  xlim(0, 300) +
   ylim(-sd_diff[2] * 3, sd_diff[2] * 3) +
   geom_abline(
     slope = 0, intercept = 0, alpha = 0.8, col = "#cc2d2d"
@@ -601,7 +583,7 @@ gg_ab1 <- data_altman %>%
 gg_ab2 <- data_altman %>%
   ggplot(aes(x = mean_calibration, y = diff_calibration)) +
   geom_point(alpha = 0.2, col = "#222225") +
-  xlim(0, 500) +
+  xlim(0, 300) +
   ylim(-sd_diff[2] * 3, sd_diff[2] * 3) +
   geom_abline(
     slope = 0, intercept = 0, alpha = 0.8, col = "#cc2d2d"
@@ -784,7 +766,7 @@ data_impact_categories %>%
 #' First, various metrics are compared where the pollen concentrations are considered a continuous numerical variable.
 #' 
 ## ----echo=FALSE-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-metrics_baseline <- data_above10 %>%
+metrics_baseline <- data_combined %>%
   pivot_wider(names_from = type) %>%
   filter(!is.na(baseline)) %>%
   mutate(
@@ -801,7 +783,7 @@ metrics_baseline <- data_above10 %>%
   ) %>%
   mutate(type = "baseline")
 
-metrics_calibration <- data_above10 %>%
+metrics_calibration <- data_combined %>%
   pivot_wider(names_from = type) %>%
   filter(!is.na(calibration)) %>%
   mutate(
@@ -835,8 +817,8 @@ metrics_baseline %>%
 #' 
 ## ----echo=FALSE-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 matrix_baseline <- confusionMatrix(
-  data_impact_categories_above10$categories_baseline,
-  data_impact_categories_above10$categories_measurement
+  data_impact_categories$categories_baseline,
+  data_impact_categories$categories_measurement
 )
 kappa_baseline <- matrix_baseline$overall[1:2] %>%
   tibble() %>%
@@ -846,8 +828,8 @@ kappa_baseline <- matrix_baseline$overall[1:2] %>%
   )
 
 matrix_calibration <- confusionMatrix(
-  data_impact_categories_above10$categories_calibration,
-  data_impact_categories_above10$categories_measurement
+  data_impact_categories$categories_calibration,
+  data_impact_categories$categories_measurement
 )
 kappa_calibration <- matrix_calibration$overall[1:2] %>%
   tibble() %>%
@@ -875,7 +857,7 @@ kappa_baseline %>%
 my_header <- c(seciesl_sel = 2)
 names(my_header) <- species_sel
 
-data_impact_categories_above10 %>%
+data_impact_categories %>%
   select(
     taxon,
     station,
@@ -976,7 +958,7 @@ matrix_baseline$byClass %>%
 npar_contr <-
   nparcomp_adjusted(
     value ~ type,
-    data = data_above10,
+    data = data_combined,
     conf.level = 0.95,
     alternative = "two.sided",
     type = "Dunnet",
