@@ -14,7 +14,7 @@ output:
 # THE USER CAN SELECT A SPECIES HERE!
 # Alnus, Betula, Corylus or Poaceae (Alder, Birch, Hazel or Grasses)
 
-species_sel <- "Betula"
+species_sel <- "Poaceae"
 ```
 
 In this project we want to evaluate the new pollen forecast module that uses "realtime data"
@@ -1190,11 +1190,18 @@ if (species_sel == "Alnus") {
 }
 ```
 
-Reviewer 2 requested a similar graph faceted by station but for the concentrations.
+Reviewer 2 requested a similar graph faceted by station but for the differences between modelled and measured concentrations.
 
 ```{r echo=FALSE}
 if (species_sel == "Alnus") {
   gg_timeseries_2020 <- data_combined %>%
+    pivot_wider(names_from = type) %>%
+    mutate(
+      baseline = baseline - measurement,
+      calibration = calibration - measurement
+    ) %>%
+    select(-measurement) %>%
+    pivot_longer(baseline:calibration, names_to = "type") %>%
     filter(
       taxon == species_sel,
       year(datetime) == 2020
@@ -1213,13 +1220,20 @@ if (species_sel == "Alnus") {
     scale_x_date(date_labels = "%e.%b") +
     xlab("") +
     ylab(paste0("")) +
-    ylab(paste0("Daily Mean Concentrations [Pollen / m³]")) +
-    ggtitle(paste0("Time Series of Daily Alnus Pollen Concentrations in the 2020 Season")) +
-    scale_color_manual("", values = col_hex) +
+    ylab(paste0("Modelled - Measured Concentration [Pollen / m³]")) +
+    ggtitle(paste0("Differences of Measured vs. Modelled Daily Alnus Pollen Concentrations in the 2020 Season")) +
+    scale_color_manual("", values = col_hex[2:3]) +
     coord_cartesian(y = c(0, 1000))
 
 
   gg_timeseries_2021 <- data_combined %>%
+    pivot_wider(names_from = type) %>%
+    mutate(
+      baseline = baseline - measurement,
+      calibration = calibration - measurement
+    ) %>%
+    select(-measurement) %>%
+    pivot_longer(baseline:calibration, names_to = "type") %>%
     filter(
       taxon == species_sel,
       year(datetime) == 2021
@@ -1238,9 +1252,9 @@ if (species_sel == "Alnus") {
     scale_x_date(date_labels = "%e.%b") +
     xlab("") +
     ylab(paste0("")) +
-    ylab(paste0("Daily Mean Concentrations [Pollen / m³]")) +
-    ggtitle(paste0("Time Series of Daily Alnus Pollen Concentrations in the 2021 Season")) +
-    scale_color_manual("", values = col_hex) +
+    ylab(paste0("Modelled - Measured Concentration [Pollen / m³]")) +
+    ggtitle(paste0("Differences of Measured vs. Modelled Daily Alnus Pollen Concentrations in the 2021 Season")) +
+    scale_color_manual("", values = col_hex[2:3]) +
     coord_cartesian(y = c(0, 1000))
 
   ggsave("vignettes/gg_timeseries_2020.png",
