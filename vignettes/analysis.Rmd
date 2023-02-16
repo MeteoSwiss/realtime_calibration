@@ -14,7 +14,7 @@ output:
 # THE USER CAN SELECT A SPECIES HERE!
 # Alnus, Betula, Corylus or Poaceae (Alder, Birch, Hazel or Grasses)
 
-species_sel <- "Poaceae"
+species_sel <- "Alnus"
 ```
 
 In this project we want to evaluate the new pollen forecast module that uses "realtime data"
@@ -1221,7 +1221,7 @@ if (species_sel == "Alnus") {
     xlab("") +
     ylab(paste0("")) +
     ylab(paste0("Modelled - Measured Concentration [Pollen / m³]")) +
-    ggtitle(paste0("Differences of Measured vs. Modelled Daily Alnus Pollen Concentrations in the 2020 Season")) +
+    ggtitle(paste0("Differences of Measured vs. Modelled Daily Alnus Pollen Concentrations in 2020")) +
     scale_color_manual("", values = col_hex[2:3]) +
     coord_cartesian(y = c(0, 1000))
 
@@ -1253,7 +1253,7 @@ if (species_sel == "Alnus") {
     xlab("") +
     ylab(paste0("")) +
     ylab(paste0("Modelled - Measured Concentration [Pollen / m³]")) +
-    ggtitle(paste0("Differences of Measured vs. Modelled Daily Alnus Pollen Concentrations in the 2021 Season")) +
+    ggtitle(paste0("Differences of Measured vs. Modelled Daily Alnus Pollen Concentrations in 2021")) +
     scale_color_manual("", values = col_hex[2:3]) +
     coord_cartesian(y = c(0, 1000))
 
