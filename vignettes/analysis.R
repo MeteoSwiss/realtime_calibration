@@ -567,7 +567,8 @@ gg_ab1 <- data_altman %>%
     intercept = sd_diff[1] * (-1.96), alpha = 0.8, linetype = 3
   ) +
   geom_smooth(alpha = 0.3, col = "#3081b8", fill = "#74cbee") +
-  labs(y = "Difference(Baseline - Measurement)", x = "Mean(Baseline, Measurement)")
+  labs(y = "Difference(Baseline - Measurement)", x = "Mean(Baseline, Measurement)") +
+  theme(plot.margin = margin(0.6, 0.2, 0.2, 0.2, "cm"))
 
 #' 
 ## ----include=FALSE---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -587,7 +588,8 @@ gg_ab2 <- data_altman %>%
     intercept = sd_diff[2] * (-1.96), alpha = 0.8, linetype = 3, size = 1
   ) +
   geom_smooth(alpha = 0.3, col = "#3081b8", fill = "#74cbee") +
-  labs(y = "Difference(Calibration - Measurement)", x = "Mean(Calibration, Measurement)")
+  labs(y = "Difference(Calibration - Measurement)", x = "Mean(Calibration, Measurement)") +
+  theme(plot.margin = margin(0.6, 0.2, 0.2, 0.2, "cm"))
 
 #' 
 ## ----echo=FALSE, warning=FALSE, message=FALSE, fig.height = 8, fig.width = 13, fig.dpi=300, out.width="100%"---------------------------------------------------------------------------------------------------------
