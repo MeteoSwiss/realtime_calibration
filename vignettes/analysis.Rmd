@@ -481,8 +481,8 @@ ci <- map(corr_matrix, ~ .x %>%
     metric = rep(c("R", "Rho", "Tau"), each = 3),
     label = paste0(method, "~", metric, ": ", lower, " - ", upper),
     comparison = rep(c("mb", "mc", "bc"), times = 3),
-    x = rep(c(2.5, 2.55, 2.5), each = 3),
-    y = rep(c(0, 0.15, 0.3), each = 3)
+    x = rep(c(2.3, 2.35, 2.3), each = 3),
+    y = rep(c(0, 0.19, 0.38), each = 3)
   )
 ```
 
