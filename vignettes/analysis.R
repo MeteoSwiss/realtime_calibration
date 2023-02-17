@@ -554,7 +554,7 @@ sd_diff <- data_altman %>%
 gg_ab1 <- data_altman %>%
   ggplot(aes(x = mean_baseline, y = diff_baseline)) +
   geom_point(alpha = 0.2, col = "#222225") +
-  coord_cartesian(x = c(0, 300), y = c(-sd_diff[2] * 3, sd_diff[2] * 3)) +
+  coord_cartesian(x = c(0, 300), y = c(-sd_diff[2] * 5, sd_diff[2] * 5)) +
   geom_abline(
     slope = 0, intercept = 0, alpha = 0.8, col = "#cc2d2d"
   ) +
@@ -573,7 +573,7 @@ gg_ab1 <- data_altman %>%
 ## ----include=FALSE---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 gg_ab2 <- data_altman %>%
   ggplot(aes(x = mean_calibration, y = diff_calibration)) +
-  coord_cartesian(x = c(0, 300), y = c(-sd_diff[2] * 3, sd_diff[2] * 3)) +
+  coord_cartesian(x = c(0, 300), y = c(-sd_diff[2] * 5, sd_diff[2] * 5)) +
   geom_point(alpha = 0.2, col = "#222225") +
   geom_abline(
     slope = 0, intercept = 0, alpha = 0.8, col = "#cc2d2d"
