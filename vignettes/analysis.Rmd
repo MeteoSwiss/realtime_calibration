@@ -1218,7 +1218,7 @@ if (species_sel == "Alnus") {
     ylab(paste0("Modelled - Measured Concentration [Pollen / m³]")) +
     ggtitle(paste0("Differences of Measured vs. Modelled Daily Alnus Pollen Concentrations in 2020")) +
     scale_color_manual("", values = col_hex[2:3]) +
-    coord_cartesian(y = c(-800, 800))
+    coord_cartesian(y = c(-500, 1500))
 
 
   gg_timeseries_2021 <- data_combined %>%
@@ -1250,7 +1250,7 @@ if (species_sel == "Alnus") {
     ylab(paste0("Modelled - Measured Concentration [Pollen / m³]")) +
     ggtitle(paste0("Differences of Measured vs. Modelled Daily Alnus Pollen Concentrations in 2021")) +
     scale_color_manual("", values = col_hex[2:3]) +
-    coord_cartesian(y = c(-800, 800))
+    coord_cartesian(y = c(-500, 1500))
 
   ggsave("vignettes/gg_timeseries_2020.png",
     gg_timeseries_2020,
