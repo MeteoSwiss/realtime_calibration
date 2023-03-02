@@ -403,7 +403,7 @@ First as a boxplot and second as a histogram of the daily differences.
   scale_fill_manual("", values = col_hex[2:3]) +
   ggtitle(paste0(
     "Boxplot of Daily ", "*",
-    species_sel, "*", " Pollen Concentrations Differences"
+    species_sel, "*", " Pollen Concentration Differences"
   )) +
   theme(plot.title = ggtext::element_markdown()))
 ```
@@ -996,7 +996,7 @@ ggsave("vignettes/gg_boxplot_conc.png",
 Reviewer 1 requested an additional graph displaying the changes of the tune factor over the course
 of a season. The following chunk loads the data and saves a line-plot:
 
-Final version of the model:
+Final variant of the model:
 
 - 5 days were regarded for the threshold, the sum of all hourly values had to surpass 720.
 - In addition the last 24h were regarded for the threshold, the sum of all hourly values had to surpass 240.
@@ -1039,7 +1039,7 @@ if (species_sel == "Alnus") {
     scale_x_date(date_labels = "%e.%b") +
     xlab("") +
     ylab(paste0("")) +
-    ggtitle(paste0("Daily Mean Tuning Factor Values (ALNUtune) - Final Model Version"))
+    ggtitle(paste0("Daily Mean Tuning Factor Values (ALNUtune) - Final Model Variant"))
 
   ggsave("vignettes/gg_tune.png", gg_tune, width = 9, height = 6, bg = "white", dpi = 300)
 
@@ -1096,7 +1096,7 @@ if (species_sel == "Alnus") {
 }
 ```
 
-Model variant 2 has the same setup as the final version except:
+Model variant 2 has the same setup as the final variant except:
 
 - The change to the tuning factor happens every hour in full (no root)
 
@@ -1143,7 +1143,7 @@ if (species_sel == "Alnus") {
 }
 ```
 
-Model variant 6 had the same setup as the final version, but the changes to the tuning factor were
+Model variant 6 had the same setup as the final variant, but the changes to the tuning factor were
 calculated based on the past 24h hours only:
 
 ```{r echo=FALSE, message=FALSE}
