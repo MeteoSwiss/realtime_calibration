@@ -1,3 +1,9 @@
+# Copyright (c) 2022 MeteoSwiss, contributors listed in AUTHORS
+ 
+# Distributed under the terms of the BSD 3-Clause License.
+ 
+# SPDX-License-Identifier: BSD-3-Clause
+
 #' ---
 #' title: "A real-time calibration method for the numerical pollen forecast model COSMO-ART"
 #' author: "Simon Adamov & Andreas Pauling"
