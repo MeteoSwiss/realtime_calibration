@@ -231,7 +231,7 @@ fit_anova <- aov(as.formula(paste("value ~ type")), data = data_combined)
 fit_anova_log <- aov(as.formula(paste("value ~ type")), data = data_log)
 ```
 
-### Are the errors independent?
+### Are the errors normally distributed?
 
 In a QQ-plot we plot the empirical quantiles (“what we see in the data”) vs. the theoretical quantiles (“what
 we expect from the model”). The plot should show a more or less straight line if the distributional assumption
@@ -254,6 +254,7 @@ gg_res2 <- tibble(residuals = residuals(fit_anova, type = "pearson")) %>%
 ggarrange(gg_res1, gg_res2, nrow = 1) %>%
   annotate_figure(top = "QQ-Plot for the ANOVA Residuals With (left) and Without Logarithmizing")
 ```
+
 ### Do the errors have mean zero? & Is the error variance constant?
 The Tukey-Anscombe plot plots the residuals vs. the fitted values. 
 It allows us to check whether the residuals have constant variance and whether the residuals have mean zero 
@@ -274,13 +275,14 @@ gg_tukey2 <-
   ggplot(aes(x = fitted, y = resid)) +
   geom_point(col = "#222225", alpha = 0.5, position = position_jitter(width = 5, height = 0)) +
   # geom_smooth(method = "loess", alpha = 0.2, col = "#3081b8", fill = "#74cbee") +
-  geom_abline(slope = 0, intercept = 0, col = "#cc2d2d")
+  geom_abline(slope = 0, intercept = 0, col = "#cc2d2d") +
+  coord_cartesian(ylim = c(-100, 100))
 
 ggarrange(gg_tukey1, gg_tukey2) %>%
   annotate_figure(top = "Tukey Anscombe - Plot for the ANOVA Residuals With (left) and Without Logarithmizing")
 ```
 
-### Are the errors normally distributed?
+### Are the errors independent?
 
 If the data has some serial structure (i.e., if observations were recorded in a certain time order), we typically
 want to check whether residuals close in time are more similar than residuals far apart, as this would be a
@@ -665,7 +667,7 @@ for (j in categs) {
     select(-measurement) %>%
     filter(categories_measurement == j) %>%
     pivot_longer(baseline:calibration, names_to = "type", values_to = "Concentration") %>%
-    mutate(type = factor(type, levels = c("calibration", "baseline", "measurement"))) %>%
+    mutate(type = factor(type, levels = c("calibration", "baseline"))) %>%
     ggplot() +
     # The area under that whole curve should be 1.
     # To get an estimate of the probability of certain values,
@@ -795,7 +797,7 @@ metrics_calibration <- data_combined %>%
   ) %>%
   mutate(type = "calibration")
 
-my_header <- c(seciesl_sel = 8)
+my_header <- 8
 names(my_header) <- species_sel
 
 metrics_baseline %>%
@@ -833,7 +835,7 @@ kappa_calibration <- matrix_calibration$overall[1:2] %>%
     metric = c("Accuracy", "Kappa")
   )
 
-my_header <- c(seciesl_sel = 3)
+my_header <- 3
 names(my_header) <- species_sel
 
 kappa_baseline %>%
@@ -849,7 +851,7 @@ We can treat them as numerical values from 0:nothing - 4: very strong.
 
 
 ```{r echo=FALSE}
-my_header <- c(seciesl_sel = 2)
+my_header <- 2
 names(my_header) <- species_sel
 
 data_impact_categories %>%
@@ -897,7 +899,7 @@ The formulas used here are:
 - F1 = (1+beta^2)*precision*recall/((beta^2 * precision)+recall)
 
 ```{r echo=FALSE}
-my_header <- c(seciesl_sel = 13)
+my_header <- 13
 names(my_header) <- species_sel
 
 matrix_baseline$byClass %>%
@@ -1179,7 +1181,7 @@ if (species_sel == "Alnus") {
     ylab(paste0("")) +
     ggtitle(paste0("Daily Mean Tuning Factor Values (ALNUtune) - Model Variant 3"))
 
-  ggsave("vignettes/gg_tune_v3.png", gg_tune_v2, width = 9, height = 6, bg = "white", dpi = 300)
+  ggsave("vignettes/gg_tune_v3.png", gg_tune_v3, width = 9, height = 6, bg = "white", dpi = 300)
 
   gg_tune_v3
 }
@@ -1267,17 +1269,19 @@ if (species_sel == "Alnus") {
 ```
 
 ```{r paper, include=FALSE}
-# Export plots for paper
-ggsave("vignettes/gg_tune.png", gg_tune, width = 10, height = 6.5, bg = "white", dpi = 300)
-ggsave("vignettes/gg_tune_v1.png", gg_tune_v1, width = 10, height = 6.5, bg = "white", dpi = 300)
-ggsave("vignettes/gg_tune_v2.png", gg_tune_v2, width = 10, height = 6.5, bg = "white", dpi = 300)
-ggsave("vignettes/gg_tune_v3.png", gg_tune_v3, width = 10, height = 6.5, bg = "white", dpi = 300)
-ggsave("vignettes/gg_timeseries_2020.png",
-  gg_timeseries_2020,
-  width = 10, height = 6.5, bg = "white", dpi = 300
-)
-ggsave("vignettes/gg_timeseries_2021.png",
-  gg_timeseries_2021,
-  width = 10, height = 6.5, bg = "white", dpi = 300
-)
+if (species_sel == "Alnus") {
+  # Export plots for paper
+  ggsave("vignettes/gg_tune.png", gg_tune, width = 10, height = 6.5, bg = "white", dpi = 300)
+  ggsave("vignettes/gg_tune_v1.png", gg_tune_v1, width = 10, height = 6.5, bg = "white", dpi = 300)
+  ggsave("vignettes/gg_tune_v2.png", gg_tune_v2, width = 10, height = 6.5, bg = "white", dpi = 300)
+  ggsave("vignettes/gg_tune_v3.png", gg_tune_v3, width = 10, height = 6.5, bg = "white", dpi = 300)
+  ggsave("vignettes/gg_timeseries_2020.png",
+    gg_timeseries_2020,
+    width = 10, height = 6.5, bg = "white", dpi = 300
+  )
+  ggsave("vignettes/gg_timeseries_2021.png",
+    gg_timeseries_2021,
+    width = 10, height = 6.5, bg = "white", dpi = 300
+  )
+}
 ```
